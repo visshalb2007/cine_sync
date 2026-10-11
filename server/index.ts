@@ -333,7 +333,7 @@ io.on('connection', (socket) => {
     }
 
     // Only host can add videos
-    if (room.hostId !== userId && room.hostId !== socket.id) {
+    if (room.hostId !== socket.id) {
       socket.emit('error', { message: 'Only host can add videos' })
       return
     }
@@ -371,7 +371,7 @@ io.on('connection', (socket) => {
     }
 
     // Only host can remove videos
-    if (room.hostId !== userId && room.hostId !== socket.id) {
+    if (room.hostId !== socket.id) {
       socket.emit('error', { message: 'Only host can remove videos' })
       return
     }
@@ -387,7 +387,7 @@ io.on('connection', (socket) => {
     room.playbackState.playlist = newPlaylist
   })
 
-  socket.on('reorder-playlist', ({ itemIds, clientSeq, baseVersion, userId }: { itemIds: string[]; clientSeq: number; baseVersion: number; userId: string }) => {
+socket.on('reorder-playlist', ({ itemIds, clientSeq, baseVersion, userId }: { itemIds: string[]; clientSeq: number; baseVersion: number; userId: string }) => {
     const roomCode = (socket as any).roomCode
     if (!roomCode) return
 
@@ -401,7 +401,7 @@ io.on('connection', (socket) => {
     }
 
     // Only host can reorder playlist
-    if (room.hostId !== userId && room.hostId !== socket.id) {
+    if (room.hostId !== socket.id) {
       socket.emit('error', { message: 'Only host can reorder playlist' })
       return
     }
@@ -420,6 +420,89 @@ io.on('connection', (socket) => {
 
     room.version++
     room.playbackState.playlist = newPlaylist
+  })
+
+  // Handle poll commands
+  type PollOption = { id: string; text: string; votes: string[] }
+  type Poll = { id: string; question: string; options: PollOption[]; votes: Record<string, string>; status: 'open' | 'closed'; closesAt?: number; addWinnerToPlaylist?: boolean }
+  
+  socket.on('create-poll', ({ question, options, addWinnerToPlaylist }: { question: string; options: string[]; addWinnerToPlaylist?: boolean }) => {
+    const roomCode = (socket as any).roomCode
+    if (!roomCode) return
+
+    const room = rooms.get(roomCode)
+    if (!room) return
+
+    // Only host can create polls
+    if (room.hostId !== socket.id) {
+      socket.emit('error', { message: 'Only host can create polls' })
+      return
+    }
+
+    const poll: Poll = {
+      id: Math.random().toString(36).substring(2, 9),
+      question,
+      options: options.map((opt) => ({ id: Math.random().toString(36).substring(2, 6), text: opt, votes: [] })),
+      votes: {},
+      status: 'open',
+      closesAt: addWinnerToPlaylist ? Date.now() + 60000 : undefined, // close after 1 min if adding to playlist
+      addWinnerToPlaylist,
+    }
+
+    // Store poll in a temporary way - we'll need to persist this
+    // For now, just broadcast the poll creation
+    io.to(roomCode).emit('poll-update', {
+      poll,
+      type: 'create',
+    })
+  })
+
+  socket.on('vote-poll', ({ pollId, optionId, clientSeq, baseVersion, userId }: { pollId: string; optionId: string; clientSeq: number; baseVersion: number; userId: string }) => {
+    const roomCode = (socket as any).roomCode
+    if (!roomCode) return
+
+    const room = rooms.get(roomCode)
+    if (!room) return
+
+    // Validate baseVersion
+    if (room.version !== baseVersion) {
+      socket.emit('error', { message: 'Stale version' })
+      return
+    }
+
+    // Find and update poll - we need to store polls per room
+    // For now, just acknowledge the vote
+    io.to(roomCode).emit('poll-update', {
+      type: 'vote',
+      pollId,
+      optionId,
+      userId,
+    })
+  })
+
+  socket.on('close-poll', ({ pollId, clientSeq, baseVersion, userId }: { pollId: string; clientSeq: number; baseVersion: number; userId: string }) => {
+    const roomCode = (socket as any).roomCode
+    if (!roomCode) return
+
+    const room = rooms.get(roomCode)
+    if (!room) return
+
+    // Validate baseVersion
+    if (room.version !== baseVersion) {
+      socket.emit('error', { message: 'Stale version' })
+      return
+    }
+
+    // Only host can close polls
+    if (room.hostId !== socket.id) {
+      socket.emit('error', { message: 'Only host can close polls' })
+      return
+    }
+
+    io.to(roomCode).emit('poll-update', {
+      type: 'close',
+      pollId,
+    })
   })
 
   socket.on('disconnect', () => {
