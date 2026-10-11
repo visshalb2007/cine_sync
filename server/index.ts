@@ -22,6 +22,14 @@ type Participant = {
   reactionHistory?: number[]
 }
 
+type PlaylistItem = {
+  id: string
+  movieId: string
+  title: string
+  addedBy: string
+  order: number
+}
+
 type Room = {
   id: string
   code: string
@@ -34,6 +42,7 @@ type Room = {
     serverTimestampMs: number
     rate: number
     version: number
+    playlist: PlaylistItem[]
   }
   version: number
 }
@@ -78,6 +87,7 @@ io.on('connection', (socket) => {
           serverTimestampMs: Date.now(),
           rate: 1,
           version: 0,
+          playlist: [],
         },
         version: 0,
       }
@@ -143,7 +153,7 @@ io.on('connection', (socket) => {
     // Send snapshot to new participant
     socket.emit('room-snapshot', {
       playbackState: room.playbackState,
-      playlist: [],
+      playlist: room.playbackState.playlist,
       activePoll: null,
       chatMessages: [],
       participants: room.participants,
@@ -157,7 +167,7 @@ io.on('connection', (socket) => {
     const socketId = sessionToken // session token is socket id
     
     // Find the room this socket was in
-    let foundRoom = null as Room | null
+    let foundRoom: Room | null = null
     let foundParticipantIndex = -1
     
     for (const [, room] of rooms) {
@@ -220,7 +230,7 @@ io.on('connection', (socket) => {
       ;(socket as any).roomCode = foundRoom.code
       socket.emit('room-snapshot', {
         playbackState: foundRoom.playbackState,
-        playlist: [],
+        playlist: foundRoom.playbackState.playlist,
         activePoll: null,
         chatMessages: [],
         participants: foundRoom.participants,
@@ -306,6 +316,110 @@ io.on('connection', (socket) => {
       userId,
       serverTimestampMs: Date.now(),
     })
+  })
+
+  // Handle playlist commands
+  socket.on('add-video', ({ movieId, title, clientSeq, baseVersion, userId }: { movieId: string; title: string; clientSeq: number; baseVersion: number; userId: string }) => {
+    const roomCode = (socket as any).roomCode
+    if (!roomCode) return
+
+    const room = rooms.get(roomCode)
+    if (!room) return
+
+    // Validate baseVersion
+    if (room.version !== baseVersion) {
+      socket.emit('error', { message: 'Stale version' })
+      return
+    }
+
+    // Only host can add videos
+    if (room.hostId !== userId && room.hostId !== socket.id) {
+      socket.emit('error', { message: 'Only host can add videos' })
+      return
+    }
+
+    const newPlaylistItem: PlaylistItem = {
+      id: Math.random().toString(36).substring(2, 9),
+      movieId,
+      title,
+      addedBy: userId,
+      order: room.playbackState.playlist.length,
+    }
+
+    const newPlaylist = [...room.playbackState.playlist, newPlaylistItem]
+    
+    io.to(roomCode).emit('playlist-update', {
+      playlist: newPlaylist,
+      version: room.version + 1,
+    })
+
+    room.version++
+    room.playbackState.playlist = newPlaylist
+  })
+
+  socket.on('remove-video', ({ itemId, clientSeq, baseVersion, userId }: { itemId: string; clientSeq: number; baseVersion: number; userId: string }) => {
+    const roomCode = (socket as any).roomCode
+    if (!roomCode) return
+
+    const room = rooms.get(roomCode)
+    if (!room) return
+
+    // Validate baseVersion
+    if (room.version !== baseVersion) {
+      socket.emit('error', { message: 'Stale version' })
+      return
+    }
+
+    // Only host can remove videos
+    if (room.hostId !== userId && room.hostId !== socket.id) {
+      socket.emit('error', { message: 'Only host can remove videos' })
+      return
+    }
+
+    const newPlaylist = room.playbackState.playlist.filter((item: PlaylistItem) => item.id !== itemId)
+    
+    io.to(roomCode).emit('playlist-update', {
+      playlist: newPlaylist,
+      version: room.version + 1,
+    })
+
+    room.version++
+    room.playbackState.playlist = newPlaylist
+  })
+
+  socket.on('reorder-playlist', ({ itemIds, clientSeq, baseVersion, userId }: { itemIds: string[]; clientSeq: number; baseVersion: number; userId: string }) => {
+    const roomCode = (socket as any).roomCode
+    if (!roomCode) return
+
+    const room = rooms.get(roomCode)
+    if (!room) return
+
+    // Validate baseVersion
+    if (room.version !== baseVersion) {
+      socket.emit('error', { message: 'Stale version' })
+      return
+    }
+
+    // Only host can reorder playlist
+    if (room.hostId !== userId && room.hostId !== socket.id) {
+      socket.emit('error', { message: 'Only host can reorder playlist' })
+      return
+    }
+
+    // Reorder playlist maintaining items not in the list at the end
+    const currentPlaylist = room.playbackState.playlist
+    const itemMap = new Map(currentPlaylist.map((item: PlaylistItem) => [item.id, item]))
+    const reorderedItems = itemIds.map((id: string) => itemMap.get(id)).filter((item): item is PlaylistItem => item !== undefined)
+    const remainingItems = currentPlaylist.filter((item: PlaylistItem) => !itemIds.includes(item.id))
+    const newPlaylist = [...reorderedItems, ...remainingItems]
+
+    io.to(roomCode).emit('playlist-update', {
+      playlist: newPlaylist,
+      version: room.version + 1,
+    })
+
+    room.version++
+    room.playbackState.playlist = newPlaylist
   })
 
   socket.on('disconnect', () => {
