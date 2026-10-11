@@ -35,7 +35,7 @@
       }
       .main { flex: 1; display: flex; flex-direction: column; padding: 16px; gap: 12px; min-width: 0; }
       .video-wrap { position: relative; background: #000; border-radius: 8px; overflow: hidden; }
-      video { width: 100%; max-height: 55vh; background: #000; display: block; }
+      video { width: 100%; max-height: 55vh; background: #000; display: block; cursor: pointer; }
       .controls {
         display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
         background: rgba(0,0,0,0.6); padding: 10px 12px; border-radius: 8px;
@@ -156,7 +156,7 @@
 
       <div class="main">
         <div class="video-wrap" id="videoWrap">
-          <video id="video" playsinline controls preload="metadata"></video>
+          <video id="video" playsinline preload="metadata"></video>
           <div id="noVideoHint">No shared video loaded.<br />Pick a sample below or paste a video URL and press “Set video”.</div>
         </div>
         <div id="errBar"></div>
@@ -351,8 +351,15 @@
 
         socket.on('error', (data) => {
           const msg = (data && data.message) || 'Server error';
-          if (!joined) joinError.textContent = msg;
-          else showError(msg);
+          if (!joined) {
+            joinError.textContent = msg;
+          } else {
+            // Our optimistic UI change was rejected: adopt the server's truth
+            // (version + playback state) so controls keep working.
+            if (data && typeof data.version === 'number') baseVersion = data.version;
+            if (data && data.playbackState) applyState(data.playbackState, false);
+            if (!/resync/i.test(msg)) showError(msg);
+          }
           console.warn('server error:', msg);
         });
 
@@ -603,13 +610,23 @@
       }
 
       // ---------- Controls ----------
-      playPauseBtn.addEventListener('click', () => {
-        if (!joined) return;
-        isPlaying = !isPlaying;
+      // Single toggle path for the button AND clicking the video itself.
+      // Desired state derives from the last server state (not the local flag),
+      // so double-clicks and cross-tab races can't wedge the button.
+      // The UI updates optimistically; if the server rejects the command,
+      // the error handler below reverts to the true room state.
+      function togglePlay() {
+        if (!joined || !socket) return;
+        const want = storedState.status === 'playing' ? 'paused' : 'playing';
+        isPlaying = want === 'playing';
         playPauseBtn.textContent = isPlaying ? 'Pause' : 'Play';
+        if (want === 'playing') video.play().catch(() => {});
+        else video.pause();
         clientSeq++;
-        socket.emit('play-pause', { status: isPlaying ? 'playing' : 'paused', clientSeq, baseVersion });
-      });
+        socket.emit('play-pause', { status: want, clientSeq, baseVersion });
+      }
+      playPauseBtn.addEventListener('click', togglePlay);
+      video.addEventListener('click', togglePlay);
       seekFwdBtn.addEventListener('click', () => {
         if (!joined || !isFinite(video.duration)) return;
         video.currentTime = Math.min(video.currentTime + 10, video.duration || video.currentTime + 10);

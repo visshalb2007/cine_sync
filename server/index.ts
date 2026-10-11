@@ -308,9 +308,14 @@ io.on('connection', (socket) => {
     const room = rooms.get(roomCode)
     if (!room) return
 
-    // Validate baseVersion
+    // Validate baseVersion. Include current state so the sender can resync
+    // instead of staying stale forever.
     if (room.version !== baseVersion) {
-      socket.emit('error', { message: 'Stale version, please reconnect state' })
+      socket.emit('error', {
+        message: 'Stale version, resynced to latest state',
+        version: room.version,
+        playbackState: room.playbackState,
+      })
       return
     }
 
@@ -336,7 +341,11 @@ io.on('connection', (socket) => {
     if (!room) return
 
     if (room.version !== baseVersion) {
-      socket.emit('error', { message: 'Stale version' })
+      socket.emit('error', {
+        message: 'Stale version, resynced to latest state',
+        version: room.version,
+        playbackState: room.playbackState,
+      })
       return
     }
 

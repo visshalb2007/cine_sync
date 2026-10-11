@@ -62,10 +62,34 @@ try {
   await setB2;
   console.log('PASS host re-opened control');
 
-  const chB = once(b, 'state-update');
-  a.emit('change-video', { videoId: 'https://example.com/v.mp4', clientSeq: 3, baseVersion: paused.version, userId: a.id });
-  const ch = await chB;
-  if (ch.playbackState.videoId !== 'https://example.com/v.mp4') throw new Error('change-video not applied');
+  // Stale command is rejected WITH resync info, and the client recovers:
+  // the next command with the fresh version is accepted.
+  const staleErr = once(b, 'error');
+  b.emit('play-pause', { status: 'playing', clientSeq: 99, baseVersion: 0 });
+  const stale = await staleErr;
+  if (typeof stale.version !== 'number' || !stale.playbackState) {
+    throw new Error('stale error missing resync info: ' + JSON.stringify(stale));
+  }
+  console.log('PASS stale rejected with resync info, version', stale.version);
+  // Collect b's updates in a queue so in-flight broadcasts can't be
+  // misattributed to the wrong command.
+  const bUpdates = [];
+  b.on('state-update', (d) => bUpdates.push(d));
+  async function waitForUpdate(pred, what) {
+    const deadline = Date.now() + 5000;
+    for (;;) {
+      const i = bUpdates.findIndex(pred);
+      if (i >= 0) return bUpdates.splice(i, 1)[0];
+      if (Date.now() > deadline) throw new Error('timeout waiting for ' + what);
+      await new Promise((r) => setTimeout(r, 25));
+    }
+  }
+  b.emit('play-pause', { status: 'playing', clientSeq: 100, baseVersion: stale.version });
+  const rec = await waitForUpdate((d) => d.playbackState.status === 'playing', 'recovery play');
+  console.log('PASS recovered with fresh version, version', rec.version);
+
+  a.emit('change-video', { videoId: 'https://example.com/v.mp4', clientSeq: 3, baseVersion: rec.version, userId: a.id });
+  const ch = await waitForUpdate((d) => d.playbackState.videoId === 'https://example.com/v.mp4', 'change-video');
   console.log('PASS change-video propagates');
 
   const rB = once(b, 'reaction');
