@@ -5,509 +5,563 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CineSync - Watch Party</title>
     <style>
-      * {
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-      }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
       body {
         font-family: system-ui, -apple-system, sans-serif;
-        background: #111;
-        color: #fff;
-        min-height: 100vh;
+        background: #111; color: #fff; min-height: 100vh;
       }
-      #root {
-        height: 100%;
-      }
-      .app {
-        display: flex;
-        height: 100%;
-      }
-      .sidebar {
-        width: 260px;
-        background: #222;
-        padding: 20px;
-        overflow-y: auto;
-      }
+      .app { display: flex; min-height: 100vh; }
+      .sidebar { width: 280px; background: #222; padding: 20px; overflow-y: auto; flex-shrink: 0; }
       .sidebar h2 {
-        margin-bottom: 20px;
-        font-size: 18px;
-        border-bottom: 1px solid #444;
-        padding-bottom: 10px;
+        margin-bottom: 12px; font-size: 18px;
+        border-bottom: 1px solid #444; padding-bottom: 10px;
       }
+      .sidebar h3 { margin: 16px 0 8px; font-size: 14px; color: #aaa; }
       .room-code {
-        background: #333;
-        padding: 8px 12px;
-        margin: 10px 0;
-        font-family: monospace;
-        font-size: 14px;
-        word-break: break-all;
-        color: #0f0;
+        background: #333; padding: 8px 12px; margin: 10px 0;
+        font-family: monospace; font-size: 16px; color: #0f0;
+        border-radius: 4px; text-align: center; letter-spacing: 2px;
       }
-      .participant {
-        display: flex;
-        align-items: center;
-        margin: 8px 0;
-        font-size: 14px;
+      .participant { display: flex; align-items: center; margin: 8px 0; font-size: 14px; }
+      .dot {
+        width: 8px; height: 8px; background: #0f0; border-radius: 50%;
+        margin-right: 8px; animation: pulse 1s infinite; flex-shrink: 0;
       }
-      .participant dot {
-        width: 8px;
-        height: 8px;
-        background: #f00;
-        border-radius: 50%;
-        margin-right: 8px;
-        animation: pulse 1s infinite;
+      @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+      .participant.offline .dot { background: #666; animation: none; }
+      .host-badge {
+        background: #b8860b; color: #111; font-size: 10px; font-weight: bold;
+        padding: 1px 6px; border-radius: 8px; margin-left: 6px;
       }
-      @keyframes pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.5; }
-      }
-      .participant.offline dot {
-        background: #666;
-        animation: none;
-      }
-      .main {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-      }
-      video {
-        width: 100%;
-        height: 100%;
-        background: #000;
-      }
+      .main { flex: 1; display: flex; flex-direction: column; padding: 16px; gap: 12px; min-width: 0; }
+      .video-wrap { position: relative; background: #000; border-radius: 8px; overflow: hidden; }
+      video { width: 100%; max-height: 55vh; background: #000; display: block; }
       .controls {
-        position: absolute;
-        bottom: 20px;
-        left: 20px;
-        right: 20px;
-        background: rgba(0,0,0,0.5);
-        padding: 12px;
-        border-radius: 8px;
-        color: #fff;
-        display: flex;
-        gap: 12px;
-        align-items: center;
-        flex-wrap: wrap;
+        display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+        background: rgba(0,0,0,0.6); padding: 10px 12px; border-radius: 8px;
       }
-      .controls button {
-        background: #fff;
-        border: none;
-        padding: 8px 16px;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 14px;
+      .controls button, .row button, .join-box button {
+        background: #fff; border: none; padding: 8px 14px;
+        border-radius: 4px; cursor: pointer; font-size: 14px;
       }
-      .controls button:hover {
-        background: #f0f0f0;
+      .controls button:hover, .row button:hover, .join-box button:hover { background: #ddd; }
+      .controls button:disabled { opacity: 0.4; cursor: not-allowed; }
+      .rate { background: #333; color: #fff; padding: 6px 10px; border-radius: 4px; font-size: 13px; }
+      .status { font-size: 12px; color: #aaa; }
+      .status.ok { color: #0f0; }
+      .status.warn { color: #ff0; }
+      .status.err { color: #f66; }
+      .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+      .row input, .join-box input {
+        padding: 8px; border-radius: 4px; border: 1px solid #444;
+        background: #111; color: #fff; font-size: 14px;
       }
-      .controls .rate {
-        background: #333;
-        color: #fff;
+      .row input { flex: 1; min-width: 180px; }
+      .chat { background: #222; border-radius: 8px; padding: 10px; height: 180px; overflow-y: auto; font-size: 13px; }
+      .chat-message { margin-bottom: 8px; padding: 6px 10px; background: #333; border-radius: 4px; max-width: 85%; word-break: break-word; }
+      .chat-message.right { margin-left: auto; background: #1d4ed8; }
+      .chat-message .who { font-size: 11px; color: #aaa; display: block; }
+      .playlist-item, .poll-option {
+        display: flex; justify-content: space-between; align-items: center;
+        background: #333; border-radius: 4px; padding: 6px 10px; margin-bottom: 6px; font-size: 13px;
       }
-      .chat {
-        flex: 1;
-        margin-top: 20px;
-        padding: 10px;
-        background: #222;
-        overflow-y: auto;
-        font-size: 13px;
-        line-height: 1.5;
+      .playlist-item button, .poll-option button {
+        background: #444; color: #fff; border: none; border-radius: 4px;
+        padding: 4px 8px; cursor: pointer; font-size: 12px;
       }
-      .chat-message {
-        margin-bottom: 10px;
-        padding: 8px 12px;
-        background: #333;
-        border-radius: 4px;
-        max-width: 80%;
+      .playlist-item button:hover, .poll-option button:hover { background: #555; }
+      .reaction-float {
+        position: absolute; font-size: 28px; pointer-events: none;
+        animation: floatUp 3s ease-out forwards; z-index: 50;
       }
-      .chat-message.right {
-        margin-left: auto;
-        background: #444;
+      @keyframes floatUp {
+        0% { opacity: 1; transform: translateY(0); }
+        100% { opacity: 0; transform: translateY(-120px); }
       }
-      .emoji-panel {
-        position: absolute;
-        top: 20px;
-        right: 20px;
-        background: #333;
-        padding: 12px;
-        border-radius: 8px;
-        display: flex;
-        gap: 8px;
-        z-index: 100;
+      /* Join overlay */
+      #joinOverlay {
+        position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+        display: flex; align-items: center; justify-content: center; z-index: 200;
       }
-      .emoji-btn {
-        width: 32px;
-        height: 32px;
-        background: #444;
-        border: none;
-        border-radius: 50%;
-        color: #fff;
-        font-size: 18px;
-        cursor: pointer;
-      }
+      .join-box { background: #222; padding: 32px; border-radius: 12px; width: 340px; text-align: center; }
+      .join-box h1 { margin-bottom: 6px; }
+      .join-box p { color: #aaa; font-size: 13px; margin-bottom: 16px; }
+      .join-box input { width: 100%; margin-bottom: 10px; text-transform: none; }
+      .join-box input#codeInput { text-transform: uppercase; text-align: center; letter-spacing: 2px; }
+      .join-box .btn-row { display: flex; gap: 8px; }
+      .join-box .btn-row button { flex: 1; }
+      #joinError { color: #f66; font-size: 13px; min-height: 18px; margin-top: 8px; }
     </style>
   </head>
   <body>
-    <div id="root">
-      <div class="app">
-        <div class="sidebar" id="sidebar">
-          <h2>Room</h2>
-          <div class="room-code" id="roomCode">--/--/--</div>
-          <div id="participants"></div>
+    <div id="joinOverlay">
+      <div class="join-box">
+        <h1>CineSync</h1>
+        <p>Watch videos together, in sync.</p>
+        <input id="nameInput" type="text" maxlength="40" placeholder="Your name" autocomplete="off" />
+        <input id="codeInput" type="text" maxlength="8" placeholder="Room code (blank = new room)" autocomplete="off" />
+        <div class="btn-row">
+          <button id="createBtn">Create room</button>
+          <button id="joinBtn">Join room</button>
         </div>
-        <div class="main">
-          <video id="video" autoplay playsinline></video>
-          <div class="controls">
-            <button id="playPause">Pause</button>
-            <button id="seekForward">+10s</button>
-            <button id="seekBackward">-10s</button>
-            <span class="rate">1x</span>
-          </div>
-          <div class="emoji-panel" id="emojiPanel">
-            <button class="emoji-btn" data-emoji="🔥">🔥</button>
-            <button class="emoji-btn" data-emoji="😂">😂</button>
-            <button class="emoji-btn" data-emoji="😮">😮</button>
-            <button class="emoji-btn" data-emoji="👍">👍</button>
-          </div>
-          <div class="chat" id="chat">
-            <div>Loading chat...</div>
-          </div>
-          <input id="chatInput" type="text" placeholder="Type a message..." style="width: 100%; padding: 8px; margin-top: 10px; border-radius: 4px; border: 1px solid #444; background: #111; color: #fff;" />
+        <div id="joinError"></div>
+      </div>
+    </div>
+
+    <div class="app">
+      <div class="sidebar">
+        <h2>Room</h2>
+        <div class="room-code" id="roomCode">------</div>
+        <div id="connStatus" class="status">connecting…</div>
+        <h3>Participants</h3>
+        <div id="participants"></div>
+        <h3>Playlist</h3>
+        <div id="playlist"></div>
+        <div class="row" style="margin-top:6px">
+          <input id="videoTitleInput" type="text" placeholder="Video title" />
+        </div>
+        <div class="row" style="margin-top:6px">
+          <input id="videoUrlInput" type="text" placeholder="Video URL or id" />
+        </div>
+        <div class="row" style="margin-top:6px">
+          <button id="addVideoBtn">Add to playlist</button>
+        </div>
+        <h3>Poll</h3>
+        <div id="poll"></div>
+        <div class="row" style="margin-top:6px">
+          <input id="pollQInput" type="text" placeholder="Poll question" />
+        </div>
+        <div class="row" style="margin-top:6px">
+          <input id="pollOptsInput" type="text" placeholder="Options, comma separated" />
+        </div>
+        <div class="row" style="margin-top:6px">
+          <button id="createPollBtn">Start poll</button>
+        </div>
+      </div>
+
+      <div class="main">
+        <div class="video-wrap" id="videoWrap">
+          <video id="video" playsinline controls></video>
+        </div>
+        <div class="controls">
+          <button id="playPause">Play</button>
+          <button id="seekBack">-10s</button>
+          <button id="seekFwd">+10s</button>
+          <span class="rate" id="rateLabel">1.0x</span>
+          <span class="status" id="driftLabel">drift: —</span>
+          <span class="status" id="clockLabel">sync: —</span>
+        </div>
+        <div class="row">
+          <input id="setVideoInput" type="text" placeholder="Set shared video URL (host)" />
+          <button id="setVideoBtn">Set video</button>
+          <button id="sampleBtn">Load sample</button>
+          <label class="status" style="cursor:pointer">Open local file
+            <input id="fileInput" type="file" accept="video/*" style="display:none" />
+          </label>
+        </div>
+        <div class="row" id="emojiRow">
+          <button class="emoji-btn" data-emoji="🔥">🔥</button>
+          <button class="emoji-btn" data-emoji="😂">😂</button>
+          <button class="emoji-btn" data-emoji="😮">😮</button>
+          <button class="emoji-btn" data-emoji="👍">👍</button>
+          <button class="emoji-btn" data-emoji="❤️">❤️</button>
+        </div>
+        <div class="chat" id="chat"><div class="status">Chat will appear here…</div></div>
+        <div class="row">
+          <input id="chatInput" type="text" maxlength="500" placeholder="Type a message…" autocomplete="off" />
+          <button id="chatSend">Send</button>
         </div>
       </div>
     </div>
 
+    <script src="/socket.io/socket.io.js"></script>
     <script type="module">
-      import { io } from 'https://cdn.socket.io/4.7.2/socket.io.esm-browser.min.js';
+      // ---------- DOM ----------
+      const $ = (id) => document.getElementById(id);
+      const video = $('video'), videoWrap = $('videoWrap');
+      const playPauseBtn = $('playPause'), seekBackBtn = $('seekBack'), seekFwdBtn = $('seekFwd');
+      const rateLabel = $('rateLabel'), driftLabel = $('driftLabel'), clockLabel = $('clockLabel');
+      const roomCodeEl = $('roomCode'), participantsEl = $('participants'), connStatus = $('connStatus');
+      const chatEl = $('chat'), chatInput = $('chatInput'), chatSend = $('chatSend');
+      const emojiRow = $('emojiRow');
+      const playlistEl = $('playlist'), videoTitleInput = $('videoTitleInput'), videoUrlInput = $('videoUrlInput');
+      const pollEl = $('poll'), pollQInput = $('pollQInput'), pollOptsInput = $('pollOptsInput');
+      const setVideoInput = $('setVideoInput');
+      const overlay = $('joinOverlay'), nameInput = $('nameInput'), codeInput = $('codeInput'), joinError = $('joinError');
 
-      let clockOffset = 0; // serverTime - clientTime
-      let lastSyncAt = 0;
-      let playbackRate = 1; // from playback state
+      // ---------- State ----------
+      let socket = null;
+      let joined = false;
+      let myName = '', myRoomCode = '';
+      let clientSeq = 0, baseVersion = 0, isPlaying = false;
+      let clockOffset = 0, lastSyncAt = 0;
+      let playbackRate = 1;
+      let storedState = { positionMs: 0, serverTimestampMs: Date.now(), rate: 1, status: 'paused', videoId: '' };
+      let lastDriftAbs = 0, consecutiveBeyond = 0;
+      let activePoll = null;
 
-      // Drift detection tracking variables
-      let lastDriftThreshold = 0;
-      let consecutiveDriftBeyondThreshold = 0;
+      const SAMPLE_URL = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
 
-      // Stored latest playback state from server
-      let storedPlaybackState: any = {
-        positionMs: 0,
-        serverTimestampMs: 0,
-        rate: 1,
-        status: 'paused'
-      };
-
-      // Reconnection state
-      let sessionToken = '';
-      let lastKnownVersion = 0;
-      let reconnectAttempts = 0;
-      const maxReconnectAttempts = 5;
-      const baseReconnectDelay = 1000; // 1 second base
-
-      async function syncClock() {
-        const clientSendTime = Date.now();
-        socket.emit('client-hello', { clientTime: clientSendTime });
-
-        await new Promise<void>((resolve) => {
-          const timeout = setTimeout(() => {
-            resolve();
-          }, 1000);
-          socket.once('sync-ack', (data: any) => {
-            clearTimeout(timeout);
-            const serverTime = data.serverTime;
-            const roundTrip = clientSendTime - serverTime;
-            clockOffset = roundTrip / 2;
-            lastSyncAt = Date.now();
-          });
-        });
+      function setConn(text, cls) {
+        connStatus.textContent = text;
+        connStatus.className = 'status' + (cls ? ' ' + cls : '');
       }
 
-      function calculateReconnectDelay(attempts: number): number {
-        // Exponential backoff with jitter
-        const delay = baseReconnectDelay * 2 ** Math.min(attempts, 5); // cap at 32s
-        const jitter = Math.random() * delay * 0.3; // 30% jitter
-        return Math.floor(delay + jitter);
+      // ---------- Socket setup ----------
+      async function getIo() {
+        if (window.io) return window.io;
+        const m = await import('https://cdn.socket.io/4.7.2/socket.io.esm.min.js');
+        return m.io;
       }
 
-      async function attemptReconnect() {
-        reconnectAttempts++;
-        const delay = calculateReconnectDelay(reconnectAttempts);
-        
-        await new Promise(resolve => setTimeout(resolve, delay));
-        
-        // Attempt reconnection
-        if (sessionToken) {
-          socket.emit('reconnect-request', { 
-            sessionToken,
-            lastVersion: lastKnownVersion 
-          });
-        } else {
-          // Fresh reconnect - just rejoin
-          socket.connect();
-        }
+      function serverNow() { return Date.now() + clockOffset; }
+
+      function expectedPosition() {
+        if (!storedState || storedState.status === 'paused') return storedState ? storedState.positionMs : 0;
+        return storedState.positionMs + (serverNow() - storedState.serverTimestampMs) * storedState.rate;
       }
 
-      async function init() {
-        // Prompt for name
-        userName = prompt('Enter your name:') || 'Anonymous';
-        if (!userName) userName = 'Anonymous';
+      function wireSocket(ioFn) {
+        const url = location.protocol.startsWith('http') ? undefined : 'http://localhost:3000';
+        socket = url ? ioFn(url) : ioFn();
+        window._socket = socket; // handy for debugging
 
-        // Initialize clock sync
-        await syncClock();
-
-        // Periodic re-sync every 30 seconds
-        setInterval(() => {
-          const clientSendTime = Date.now();
-          socket.emit('client-hello', { clientTime: clientSendTime });
-          socket.once('sync-ack', (data: any) => {
-            const serverTime = data.serverTime;
-            const roundTrip = clientSendTime - serverTime;
-            clockOffset = roundTrip / 2;
-            lastSyncAt = Date.now();
-          });
-        }, 30000);
-
-        // Join room
-        const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-        
-        socket = io();
-
-        socket.on('join-room', { roomCode, name: userName, sessionToken: sessionToken });
-
-        socket.on('room-snapshot', (data: any) => {
-          // Load video
-          video.src = '/watch/' + data.playbackState.videoId;
-          
-          // Set initial position
-          video.currentTime = data.playbackState.positionMs / 1000;
-          
-          if (data.playbackState.status === 'playing') {
-            video.play();
-          }
-          
-          // Store playback state and update UI
-          storedPlaybackState = data.playbackState;
-          playbackRate = data.playbackState.rate;
-          rateSpan.textContent = playbackRate.toFixed(1) + 'x';
-          
-          // Save session token for reconnection
-          sessionToken = data.sessionToken || socket.id;
-          lastKnownVersion = data.version;
-          
-          // Update UI
-          roomCodeDiv.textContent = 'Room: ' + data.roomCode;
-          
-          // Update participants
-          updateParticipants(data.participants);
-          
-          // Reset reconnection attempts on successful join
-          reconnectAttempts = 0;
+        socket.on('connect', () => {
+          setConn('connected', 'ok');
+          // clock sync handshake
+          const t = Date.now();
+          socket.emit('client-hello', { clientTime: t });
+          // re-join after a drop so playback resumes
+          if (joined) socket.emit('join-room', { roomCode: myRoomCode, name: myName });
         });
 
-        socket.on('participants-update', (data: any) => {
-          updateParticipants(data.participants);
+        socket.on('disconnect', () => setConn('reconnecting…', 'warn'));
+
+        socket.on('sync-ack', (data) => {
+          clockOffset = data.offset || 0;
+          lastSyncAt = Date.now();
+          clockLabel.textContent = 'sync: ' + Math.round(clockOffset) + 'ms';
         });
 
-        socket.on('state-update', (data: any) => {
-          const { playbackState, version } = data;
-          baseVersion = version;
-          storedPlaybackState = playbackState;
-          playbackRate = playbackState.rate;
-          rateSpan.textContent = playbackRate.toFixed(1) + 'x';
-          
-          // Compute expected position using server timeline
-          const serverNow = Date.now() + clockOffset; // approximate server time
-          let expected;
-          if (playbackState.status === 'paused') {
-            expected = playbackState.positionMs;
-          } else {
-            expected = playbackState.positionMs + (serverNow - playbackState.serverTimestampMs) * playbackRate;
-          }
-          
-          // Reconcile video position
-          const actual = video.currentTime * 1000; // in ms
-          const drift = actual - expected;
-          
-          // Apply position with drift correction logic
-          video.currentTime = expected / 1000;
-          
-          if (playbackState.status === 'playing' && !isPlaying) {
-            video.play();
-            isPlaying = true;
-            playPauseBtn.textContent = 'Pause';
-          } else if (playbackState.status === 'paused' && isPlaying) {
-            video.pause();
-            isPlaying = false;
-            playPauseBtn.textContent = 'Play';
-          }
+        socket.on('server-time', (data) => {
+          clockOffset = (Date.now() - data.serverTime) / 2;
+          lastSyncAt = Date.now();
+          clockLabel.textContent = 'sync: ' + Math.round(clockOffset) + 'ms';
         });
 
-        socket.on('chat-message', (data: any) => {
-          const msgDiv = document.createElement('div');
-          msgDiv.className = `chat-message ${data.userId === socket.id ? 'right' : ''}`;
-          msgDiv.textContent = `${data.name}: ${data.text}`;
-          chat.appendChild(msgDiv);
-          chat.scrollTop = chat.scrollHeight;
+        socket.on('room-snapshot', onSnapshot);
+        socket.on('room-snapshot-resume', (data) => {
+          baseVersion = data.version;
+          applyState(data.playbackState, true);
         });
-      }
 
-      function updateParticipants(participants: any[]) {
-        const onlineParticipants = participants.map(p => `
-          <div class="participant ${p.connected ? '' : 'offline'}">
-            <div dot></div>${p.name}
-          </div>
-        `).join('');
-        participantsDiv.innerHTML = onlineParticipants.join('');
-      }
-
-      playPauseBtn.addEventListener('click', () => {
-        isPlaying = !isPlaying;
-        playPauseBtn.textContent = isPlaying ? 'Pause' : 'Play';
-        
-        clientSeq++;
-        socket.emit('play-pause', { 
-          status: isPlaying ? 'playing' : 'paused', 
-          clientSeq,
-          baseVersion 
+        socket.on('participants-update', (data) => {
+          renderParticipants(data.participants || []);
+          if (data.roomCode) { myRoomCode = data.roomCode; roomCodeEl.textContent = myRoomCode; }
         });
-      });
 
-      seekForwardBtn.addEventListener('click', () => {
-        video.currentTime = Math.min(video.currentTime + 10, video.duration);
-        clientSeq++;
-        socket.emit('seek', { 
-          positionMs: Math.round(video.currentTime * 1000), 
-          clientSeq,
-          baseVersion 
+        socket.on('state-update', (data) => {
+          baseVersion = data.version;
+          applyState(data.playbackState, false);
         });
-      });
 
-      seekBackwardBtn.addEventListener('click', () => {
-        video.currentTime = Math.max(video.currentTime - 10, 0);
-        clientSeq++;
-        socket.emit('seek', { 
-          positionMs: Math.round(video.currentTime * 1000), 
-          clientSeq,
-          baseVersion 
+        socket.on('chat-message', (data) => addChat(data.name, data.text, data.userId === socket.id));
+        socket.on('reaction', (data) => showReaction(data.emoji));
+
+        socket.on('playlist-update', (data) => {
+          baseVersion = data.version;
+          renderPlaylist(data.playlist || []);
         });
-      });
 
-      chatInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter' && chatInput.value.trim()) {
-          clientSeq++;
-          socket.emit('chat-message', { 
-            text: chatInput.value.trim(), 
-            clientSeq,
-            baseVersion,
-            userId: socket.id
-          });
-          chatInput.value = '';
-        }
-      });
-
-      // Emoji reactions
-      emojiPanel.addEventListener('click', (e) => {
-        const target = e.target as HTMLElement;
-        if (target.classList.contains('emoji-btn')) {
-          const emoji = target.dataset.emoji;
-          clientSeq++;
-          socket.emit('reaction', { 
-            emoji,
-            clientSeq,
-            baseVersion,
-            userId: socket.id
-          });
-        }
-      });
-      
-      // Chat send on focus out too
-      chatInput.addEventListener('blur', (e) => {
-        if (chatInput.value.trim() && e.relatedTarget !== null) {
-          // Don't send on blur if clicking elsewhere in chat
-          const relatedIsChat = (e.relatedTarget as Node).closest('.chat');
-          if (!relatedIsChat) {
-            if (chatInput.value.trim()) {
-              clientSeq++;
-              socket.emit('chat-message', { 
-                text: chatInput.value.trim(), 
-                clientSeq,
-                baseVersion,
-                userId: socket.id
-              });
+        socket.on('poll-update', (data) => {
+          if (data.type === 'create') { activePoll = data.poll; renderPoll(); }
+          else if (data.type === 'vote') {
+            if (activePoll && activePoll.id === data.pollId) {
+              activePoll.votes[data.userId] = data.optionId;
+              renderPoll();
             }
-            chatInput.value = '';
+          } else if (data.type === 'close') {
+            if (activePoll && activePoll.id === data.pollId) { activePoll.status = 'closed'; renderPoll(); }
           }
-        }
-      });
+        });
 
-      // Drift detection & correction loop - check every 2 seconds
+        socket.on('host-transfer', () => addChat('System', 'Host transferred.', false));
+
+        socket.on('error', (data) => {
+          if (!joined) joinError.textContent = (data && data.message) || 'Error joining room';
+          else console.warn('server error:', data && data.message);
+        });
+
+        // periodic clock re-sync
+        setInterval(() => {
+          if (socket && socket.connected) socket.emit('client-hello', { clientTime: Date.now() });
+        }, 30000);
+      }
+
+      // ---------- Playback ----------
+      function loadVideoSource(videoId) {
+        if (!videoId) return;
+        // Accept full URLs directly; bare ids use the legacy /watch/ path
+        const src = /^https?:\/\//i.test(videoId) ? videoId : '/watch/' + videoId;
+        if (video.src !== src && !video.src.endsWith(encodeURI(src))) {
+          try { video.src = src; } catch (e) { console.warn('video load failed', e); }
+        }
+      }
+
+      function applyState(ps, hard) {
+        storedState = ps;
+        playbackRate = ps.rate || 1;
+        video.playbackRate = playbackRate;
+        rateLabel.textContent = Number(playbackRate).toFixed(1) + 'x';
+        loadVideoSource(ps.videoId);
+        const expected = ps.status === 'paused'
+          ? ps.positionMs
+          : ps.positionMs + (serverNow() - ps.serverTimestampMs) * playbackRate;
+        if (hard || Math.abs(video.currentTime * 1000 - expected) > 40 || !isFinite(video.currentTime)) {
+          try { video.currentTime = Math.max(0, expected / 1000); } catch (e) {}
+        }
+        if (ps.status === 'playing' && !isPlaying) {
+          isPlaying = true; playPauseBtn.textContent = 'Pause';
+          video.play().catch(() => {});
+        } else if (ps.status !== 'playing' && isPlaying) {
+          isPlaying = false; playPauseBtn.textContent = 'Play';
+          video.pause();
+        }
+      }
+
+      function onSnapshot(data) {
+        joined = true;
+        overlay.style.display = 'none';
+        myRoomCode = data.roomCode || myRoomCode;
+        roomCodeEl.textContent = myRoomCode || '------';
+        baseVersion = data.version || 0;
+        renderParticipants(data.participants || []);
+        renderPlaylist(data.playlist || []);
+        chatEl.innerHTML = '';
+        (data.chatMessages || []).forEach((m) => addChat(m.name, m.text, false));
+        applyState(data.playbackState, true);
+        setConn('connected · room ' + myRoomCode, 'ok');
+      }
+
+      // Drift detection + correction every 2s
       setInterval(() => {
-        if (!video.src) return;
-        
-        const serverNow = Date.now() + clockOffset;
-        const expected = storedPlaybackState.rate > 0 
-          ? storedPlaybackState.positionMs + (serverNow - storedPlaybackState.serverTimestampMs) * storedPlaybackState.rate
-          : storedPlaybackState.positionMs;
-        
-        const actual = video.currentTime * 1000;
+        if (!joined || !video.src) return;
+        const expected = expectedPosition();
+        const actual = (isFinite(video.currentTime) ? video.currentTime : 0) * 1000;
         const drift = actual - expected;
-        
-        // Hysteresis: only act if drift stays beyond threshold for 2 consecutive checks
-        if (Math.abs(drift) > lastDriftThreshold) {
-          consecutiveDriftBeyondThreshold++;
+        const abs = Math.abs(drift);
+        driftLabel.textContent = 'drift: ' + Math.round(drift) + 'ms';
+        driftLabel.className = 'status' + (abs < 100 ? ' ok' : abs <= 500 ? ' warn' : ' err');
+
+        if (abs > lastDriftAbs) consecutiveBeyond++; else consecutiveBeyond = 0;
+        lastDriftAbs = abs;
+        if (consecutiveBeyond < 2 || storedState.status === 'paused') {
+          if (abs < 100) { consecutiveBeyond = 0; lastDriftAbs = 0; }
+          return;
+        }
+        if (abs < 100) { consecutiveBeyond = 0; lastDriftAbs = 0; }
+        else if (abs > 500) {
+          try { video.currentTime = Math.max(0, expected / 1000); } catch (e) {}
+          consecutiveBeyond = 0; lastDriftAbs = 0;
         } else {
-          consecutiveDriftBeyondThreshold = 0;
-        }
-        lastDriftThreshold = Math.abs(drift);
-        
-        // Apply correction based on drift magnitude and hysteresis
-        if (consecutiveDriftBeyondThreshold >= 2) {
-          if (Math.abs(drift) < 100) {
-            // Dead zone: ignore, reset hysteresis
-            consecutiveDriftBeyondThreshold = 0;
-            lastDriftThreshold = 0;
-          } else if (Math.abs(drift) > 500) {
-            // Hard seek: move to expected position
-            video.currentTime = expected / 1000;
-            consecutiveDriftBeyondThreshold = 0;
-            lastDriftThreshold = 0;
-          } else {
-            // Soft correction: adjust playbackRate toward 1.0
-            const driftDirection = drift > 0 ? 1 : -1;
-            playbackRate += driftDirection * 0.02; // 2% adjustment per check
-            // Clamp playbackRate to reasonable bounds
-            playbackRate = Math.max(0.5, Math.min(1.5, playbackRate));
-            // Apply adjusted rate to video
-            video.playbackRate = playbackRate;
-            // Update UI display
-            rateSpan.textContent = playbackRate.toFixed(1) + 'x';
-          }
-        }
-        
-        // Log drift for monitoring
-        if (Math.abs(drift) > 100 && consecutiveDriftBeyondThreshold >= 2) {
-          console.log(`Drift: ${drift}ms (expected: ${expected}ms, actual: ${actual}ms), rate: ${playbackRate.toFixed(2)}x`);
+          const dir = drift > 0 ? 1 : -1;
+          playbackRate = Math.max(0.5, Math.min(1.5, playbackRate + dir * 0.02));
+          video.playbackRate = playbackRate;
+          rateLabel.textContent = playbackRate.toFixed(1) + 'x';
         }
       }, 2000);
 
-      init();
+      // ---------- UI render ----------
+      function renderParticipants(list) {
+        const me = socket ? socket.id : '';
+        participantsEl.innerHTML = list.map((p) =>
+          '<div class="participant">' +
+          '<span class="dot"></span><span>' + escapeHtml(p.name) + '</span>' +
+          (p.id === me ? '<span class="host-badge">YOU</span>' : '') +
+          '</div>'
+        ).join('');
+      }
 
-      // Handle disconnect - start reconnection process
-      socket.on('disconnect', () => {
-        console.log('Disconnected from server, attempting reconnection...');
-        
-        // Save current state before disconnect
-        const currentPlaybackState = {
-          positionMs: video.currentTime * 1000,
-          status: video.paused ? 'paused' : 'playing',
-          rate: video.playbackRate,
-          serverTimestampMs: Date.now()
-        };
-        lastKnownVersion = baseVersion;
-        
-        // Attempt reconnection after delay
-        attemptReconnect();
+      function renderPlaylist(list) {
+        if (!list.length) { playlistEl.innerHTML = '<div class="status">Empty — add a video below.</div>'; return; }
+        playlistEl.innerHTML = list.map((it) =>
+          '<div class="playlist-item"><span>' + escapeHtml(it.title || it.movieId) + '</span>' +
+          '<span><button data-play="' + escapeHtml(it.movieId) + '">Play</button> ' +
+          '<button data-del="' + it.id + '">✕</button></span></div>'
+        ).join('');
+      }
+
+      playlistEl.addEventListener('click', (e) => {
+        const t = e.target;
+        if (t.dataset && t.dataset.play) {
+          clientSeq++;
+          socket.emit('change-video', { videoId: t.dataset.play, clientSeq, baseVersion, userId: socket.id });
+        } else if (t.dataset && t.dataset.del) {
+          clientSeq++;
+          socket.emit('remove-video', { itemId: t.dataset.del, clientSeq, baseVersion, userId: socket.id });
+        }
       });
+
+      function renderPoll() {
+        if (!activePoll) { pollEl.innerHTML = '<div class="status">No active poll.</div>'; return; }
+        const counts = {};
+        Object.values(activePoll.votes || {}).forEach((opt) => { counts[opt] = (counts[opt] || 0) + 1; });
+        pollEl.innerHTML = '<div class="status">' + escapeHtml(activePoll.question) + '</div>' +
+          activePoll.options.map((o) =>
+            '<div class="poll-option"><span>' + escapeHtml(o.text) + ' (' + (counts[o.id] || 0) + ')</span>' +
+            (activePoll.status === 'open'
+              ? '<button data-vote="' + o.id + '">Vote</button>'
+              : '') + '</div>'
+          ).join('') +
+          (activePoll.status === 'open' ? '<div class="row" style="margin-top:6px"><button id="closePollBtn">Close poll</button></div>' : '<div class="status">Closed</div>');
+      }
+      renderPoll();
+
+      pollEl.addEventListener('click', (e) => {
+        const t = e.target;
+        if (t.dataset && t.dataset.vote && activePoll) {
+          clientSeq++;
+          socket.emit('vote-poll', { pollId: activePoll.id, optionId: t.dataset.vote, clientSeq, baseVersion, userId: socket.id });
+        } else if (t.id === 'closePollBtn' && activePoll) {
+          clientSeq++;
+          socket.emit('close-poll', { pollId: activePoll.id, clientSeq, baseVersion, userId: socket.id });
+        }
+      });
+
+      function addChat(who, text, mine) {
+        const d = document.createElement('div');
+        d.className = 'chat-message' + (mine ? ' right' : '');
+        const w = document.createElement('span');
+        w.className = 'who'; w.textContent = who;
+        d.appendChild(w);
+        d.appendChild(document.createTextNode(text));
+        chatEl.appendChild(d);
+        chatEl.scrollTop = chatEl.scrollHeight;
+      }
+
+      function showReaction(emoji) {
+        const s = document.createElement('span');
+        s.className = 'reaction-float';
+        s.textContent = emoji;
+        s.style.left = (20 + Math.random() * 60) + '%';
+        s.style.bottom = '120px';
+        videoWrap.appendChild(s);
+        setTimeout(() => s.remove(), 3000);
+      }
+
+      function escapeHtml(s) {
+        return String(s == null ? '' : s)
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      }
+
+      // ---------- Controls ----------
+      playPauseBtn.addEventListener('click', () => {
+        if (!joined) return;
+        isPlaying = !isPlaying;
+        playPauseBtn.textContent = isPlaying ? 'Pause' : 'Play';
+        clientSeq++;
+        socket.emit('play-pause', { status: isPlaying ? 'playing' : 'paused', clientSeq, baseVersion });
+      });
+      seekFwdBtn.addEventListener('click', () => {
+        if (!joined || !isFinite(video.duration)) return;
+        video.currentTime = Math.min(video.currentTime + 10, video.duration || video.currentTime + 10);
+        clientSeq++;
+        socket.emit('seek', { positionMs: Math.round(video.currentTime * 1000), clientSeq, baseVersion });
+      });
+      seekBackBtn.addEventListener('click', () => {
+        if (!joined) return;
+        video.currentTime = Math.max(video.currentTime - 10, 0);
+        clientSeq++;
+        socket.emit('seek', { positionMs: Math.round(video.currentTime * 1000), clientSeq, baseVersion });
+      });
+
+      function sendChat() {
+        const v = chatInput.value.trim();
+        if (!v || !joined) return;
+        clientSeq++;
+        socket.emit('chat-message', { text: v, clientSeq, baseVersion, userId: socket ? socket.id : '' });
+        chatInput.value = '';
+      }
+      chatSend.addEventListener('click', sendChat);
+      chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendChat(); });
+
+      emojiRow.addEventListener('click', (e) => {
+        const t = e.target.closest ? e.target.closest('.emoji-btn') : null;
+        if (!t || !joined) return;
+        clientSeq++;
+        socket.emit('reaction', { emoji: t.dataset.emoji, clientSeq, baseVersion, userId: socket.id });
+        showReaction(t.dataset.emoji);
+      });
+
+      $('addVideoBtn').addEventListener('click', () => {
+        if (!joined) return;
+        const title = videoTitleInput.value.trim() || videoUrlInput.value.trim();
+        const movieId = videoUrlInput.value.trim();
+        if (!movieId) return;
+        clientSeq++;
+        socket.emit('add-video', { movieId, title, clientSeq, baseVersion, userId: socket.id });
+        videoTitleInput.value = ''; videoUrlInput.value = '';
+      });
+
+      $('createPollBtn').addEventListener('click', () => {
+        if (!joined) return;
+        const q = pollQInput.value.trim();
+        const opts = pollOptsInput.value.split(',').map((s) => s.trim()).filter(Boolean);
+        if (!q || opts.length < 2) return;
+        socket.emit('create-poll', { question: q, options: opts });
+        pollQInput.value = ''; pollOptsInput.value = '';
+      });
+
+      $('setVideoBtn').addEventListener('click', () => {
+        if (!joined) return;
+        const v = setVideoInput.value.trim();
+        if (!v) return;
+        clientSeq++;
+        socket.emit('change-video', { videoId: v, clientSeq, baseVersion, userId: socket.id });
+      });
+
+      $('sampleBtn').addEventListener('click', () => {
+        video.src = SAMPLE_URL;
+        video.play().catch(() => {});
+      });
+
+      $('fileInput').addEventListener('change', (e) => {
+        const f = e.target.files && e.target.files[0];
+        if (!f) return;
+        video.src = URL.createObjectURL(f);
+        video.play().catch(() => {});
+      });
+
+      // ---------- Join ----------
+      function doJoin(code) {
+        joinError.textContent = '';
+        myName = (nameInput.value.trim() || 'Anonymous').slice(0, 40);
+        myRoomCode = (code || '').trim().toUpperCase();
+        socket.emit('join-room', { roomCode: myRoomCode, name: myName });
+      }
+      $('createBtn').addEventListener('click', () => doJoin(''));
+      $('joinBtn').addEventListener('click', () => {
+        if (!codeInput.value.trim()) { joinError.textContent = 'Enter a room code, or Create room.'; return; }
+        doJoin(codeInput.value);
+      });
+      // prefill code from ?code= links
+      try {
+        const q = new URLSearchParams(location.search).get('code');
+        if (q) codeInput.value = q.toUpperCase();
+      } catch (e) {}
+
+      // ---------- Boot ----------
+      (async function boot() {
+        try {
+          const ioFn = await getIo();
+          wireSocket(ioFn);
+        } catch (err) {
+          setConn('failed to load socket.io', 'err');
+          joinError.textContent = 'Could not connect. Is the server running on :3000?';
+          console.error(err);
+        }
+      })();
     </script>
   </body>
 </html>

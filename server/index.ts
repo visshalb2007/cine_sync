@@ -1,9 +1,29 @@
 import { createServer } from 'http'
 import { Server } from 'socket.io'
 import express from 'express'
+import path from 'path'
+import fs from 'fs'
 
 const app = express()
 const httpServer = createServer(app)
+
+// Serve the client HTML/JS so http://localhost:3000 just works.
+// Works both via tsx (server/...) and compiled output (dist/server/...).
+const clientDirCandidates = [
+  path.join(__dirname, '..', 'client', 'public'),
+  path.join(__dirname, '..', '..', 'client', 'public'),
+  path.join(process.cwd(), 'client', 'public'),
+]
+const clientDir =
+  clientDirCandidates.find((d) => fs.existsSync(path.join(d, 'index.html'))) ??
+  clientDirCandidates[0]
+app.use(express.static(clientDir))
+app.get('/health', (_req, res) => {
+  res.json({ ok: true, rooms: rooms.size, now: Date.now() })
+})
+app.get('/', (_req, res) => {
+  res.sendFile(path.join(clientDir, 'index.html'))
+})
 const io = new Server(httpServer, {
   cors: {
     origin: '*',
@@ -69,15 +89,21 @@ io.on('connection', (socket) => {
     })
   })
 
-  // Join room by code
+  // Join room by code. Empty code = create a new room.
   socket.on('join-room', ({ roomCode, name, sessionToken }: { roomCode: string; name: string; sessionToken?: string }) => {
-    let room = rooms.get(roomCode)
+    const cleanName = String(name ?? '').slice(0, 40) || 'Anonymous'
+    const wantCode = String(roomCode ?? '').trim().toUpperCase()
+    let room = wantCode ? rooms.get(wantCode) : undefined
     if (!room) {
-      // Create new room
-      const newCode = Math.random().toString(36).substring(2, 8).toUpperCase()
+      // Create new room: reuse a caller-supplied code when it looks valid,
+      // otherwise generate one. This keeps invite links working.
+      const code =
+        wantCode && /^[A-Z0-9]{4,8}$/.test(wantCode)
+          ? wantCode
+          : Math.random().toString(36).substring(2, 8).toUpperCase()
       room = {
         id: socket.id,
-        code: newCode,
+        code,
         hostId: socket.id,
         participants: [],
         playbackState: {
@@ -91,8 +117,8 @@ io.on('connection', (socket) => {
         },
         version: 0,
       }
-      rooms.set(newCode, room)
-      console.log('Created new room:', newCode)
+      rooms.set(code, room)
+      console.log('Created new room:', code)
     }
 
     // Check if this is a reconnection with existing session
@@ -108,20 +134,21 @@ io.on('connection', (socket) => {
         existingParticipant.joinedAt = Date.now() - (existingParticipant.joinedAt - (existingParticipant.leftAt ? existingParticipant.leftAt - existingParticipant.joinedAt : 0))
         
         // Broadcast updated participant list
-        io.to(roomCode).emit('participants-update', {
+        io.to(room.code).emit('participants-update', {
           participants: room.participants,
-          roomCode,
+          roomCode: room.code,
         })
 
         // Send snapshot resume from current version
-        socket.join(roomCode)
-        ;(socket as any).roomCode = roomCode
+        socket.join(room.code)
+        ;(socket as any).roomCode = room.code
         socket.emit('room-snapshot-resume', {
+          roomCode: room.code,
           playbackState: room.playbackState,
           version: room.version,
         })
-        
-        console.log(`Participant ${name} reconnected within grace period`)
+
+        console.log(`Participant ${cleanName} reconnected within grace period`)
         return
       }
     }
@@ -129,7 +156,7 @@ io.on('connection', (socket) => {
     // Add participant
     const participant: Participant = {
       id: socket.id,
-      name,
+      name: cleanName,
       connected: true,
       joinedAt: Date.now(),
     }
@@ -140,18 +167,20 @@ io.on('connection', (socket) => {
       room.hostId = socket.id
     }
 
-    socket.join(roomCode)
-    ;(socket as any).roomCode = roomCode
+    socket.join(room.code)
+    ;(socket as any).roomCode = room.code
     ;(socket as any).sessionToken = socket.id // session token is the socket id
 
     // Broadcast updated participant list
-    io.to(roomCode).emit('participants-update', {
+    io.to(room.code).emit('participants-update', {
       participants: room.participants,
-      roomCode,
+      roomCode: room.code,
     })
 
     // Send snapshot to new participant
     socket.emit('room-snapshot', {
+      roomCode: room.code,
+      version: room.version,
       playbackState: room.playbackState,
       playlist: room.playbackState.playlist,
       activePoll: null,
@@ -159,7 +188,7 @@ io.on('connection', (socket) => {
       participants: room.participants,
     })
 
-    console.log(`Participant ${name} joined room ${roomCode}, total: ${room.participants.length}`)
+    console.log(`Participant ${cleanName} joined room ${room.code}, total: ${room.participants.length}`)
   })
 
   // Handle reconnect event
@@ -284,6 +313,35 @@ io.on('connection', (socket) => {
     })
   })
 
+  socket.on('change-video', ({ videoId, clientSeq, baseVersion, userId }: { videoId: string; clientSeq: number; baseVersion: number; userId: string }) => {
+    const roomCode = (socket as any).roomCode
+    if (!roomCode) return
+
+    const room = rooms.get(roomCode)
+    if (!room) return
+
+    if (room.version !== baseVersion) {
+      socket.emit('error', { message: 'Stale version' })
+      return
+    }
+
+    // Only host can change the video
+    if (room.hostId !== userId && room.hostId !== socket.id) {
+      socket.emit('error', { message: 'Only host can change the video' })
+      return
+    }
+
+    room.playbackState.videoId = String(videoId ?? '').slice(0, 500)
+    room.playbackState.status = 'paused'
+    room.playbackState.positionMs = 0
+    room.playbackState.serverTimestampMs = Date.now()
+    room.version++
+    io.to(roomCode).emit('state-update', {
+      playbackState: room.playbackState,
+      version: room.version,
+    })
+  })
+
   socket.on('reaction', ({ emoji, baseVersion, clientSeq, userId }: { emoji: string; baseVersion: number; clientSeq: number; userId: string }) => {
     const roomCode = (socket as any).roomCode
     if (!roomCode) return
@@ -315,6 +373,37 @@ io.on('connection', (socket) => {
       emoji,
       userId,
       serverTimestampMs: Date.now(),
+    })
+  })
+
+  socket.on('chat-message', ({ text, clientSeq, baseVersion, userId }: { text: string; clientSeq: number; baseVersion: number; userId: string }) => {
+    const roomCode = (socket as any).roomCode
+    if (!roomCode) return
+
+    const room = rooms.get(roomCode)
+    if (!room) return
+
+    // Basic sanitization + length cap (strip HTML tags, cap 500 chars)
+    const clean = String(text ?? '').replace(/<[^>]*>/g, '').slice(0, 500).trim()
+    if (!clean) return
+
+    // Rate limit: max 5 messages per 10s per sender
+    const now = Date.now()
+    const history = ((socket as any).chatHistory ?? []) as number[]
+    const recent = history.filter((ts: number) => now - ts < 10000)
+    if (recent.length >= 5) {
+      socket.emit('error', { message: 'Rate limited: max 5 messages per 10 seconds' })
+      return
+    }
+    recent.push(now)
+    ;(socket as any).chatHistory = recent
+
+    const sender = room.participants.find((p) => p.id === socket.id)
+    io.to(roomCode).emit('chat-message', {
+      userId: socket.id,
+      name: sender ? sender.name : 'Anonymous',
+      text: clean,
+      serverTimestampMs: now,
     })
   })
 
