@@ -5,10 +5,11 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "test:unit": "npx ttest",
+    "test:unit": "npx vitest run",
     "test:playwright": "npx playwright test",
-    "test:bench": "npx ts-node bot-harness.ts",
-    "dev": "npx ts-node-dev server/index.ts",
+    "test:bench": "npx tsx bot-harness.ts",
+    "dev": "npx tsx watch server/index.ts",
+    "start": "node dist/server/index.js",
     "build": "npx tsc"
   },
   "repository": {
@@ -42,6 +43,8 @@
     "@types/react-dom": "^19.3.0",
     "babel": "^5.8.38",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "tsx": "^4.23.15",
+    "vitest": "^5.0.3"
   }
 }
