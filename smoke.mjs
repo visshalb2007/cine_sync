@@ -97,6 +97,18 @@ try {
   await rB;
   console.log('PASS reaction broadcast');
 
+  // Host transfer: guest becomes host and can toggle control
+  const setA = once(a, 'room-settings');
+  a.emit('transfer-host', { userId: b.id });
+  const transferred = await setA;
+  if (transferred.hostId !== b.id) throw new Error('host transfer failed: ' + JSON.stringify(transferred));
+  console.log('PASS host transferred to guest');
+  const setA2 = once(a, 'room-settings');
+  b.emit('toggle-control', { open: false, userId: b.id });
+  const toggled = await setA2;
+  if (toggled.everyoneCanControl !== false) throw new Error('new host cannot toggle');
+  console.log('PASS new host controls room');
+
   console.log('ALL SMOKE TESTS PASSED');
 } finally {
   a.disconnect();

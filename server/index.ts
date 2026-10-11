@@ -658,6 +658,56 @@ socket.on('reorder-playlist', ({ itemIds, clientSeq, baseVersion, userId }: { it
     })
   })
 
+  // Host-only: hand hosting to another participant
+  socket.on('transfer-host', ({ userId }: { userId: string }) => {
+    const roomCode = (socket as any).roomCode
+    if (!roomCode) return
+
+    const room = rooms.get(roomCode)
+    if (!room) return
+
+    if (room.hostId !== socket.id) {
+      socket.emit('error', { message: 'Only the host can transfer hosting' })
+      return
+    }
+    if (!room.participants.some((p) => p.id === userId)) {
+      socket.emit('error', { message: 'That user is not in the room' })
+      return
+    }
+
+    room.hostId = userId
+    io.to(roomCode).emit('room-settings', {
+      everyoneCanControl: room.everyoneCanControl,
+      hostId: room.hostId,
+    })
+    io.to(roomCode).emit('participants-update', roomInfo(room))
+    console.log(`Host transferred to ${userId} in room ${roomCode}`)
+  })
+
+  // Host-only: remove a participant (they are disconnected)
+  socket.on('remove-participant', ({ userId }: { userId: string }) => {
+    const roomCode = (socket as any).roomCode
+    if (!roomCode) return
+
+    const room = rooms.get(roomCode)
+    if (!room) return
+
+    if (room.hostId !== socket.id) {
+      socket.emit('error', { message: 'Only the host can remove people' })
+      return
+    }
+    if (userId === socket.id) {
+      socket.emit('error', { message: 'You cannot remove yourself' })
+      return
+    }
+
+    room.participants = room.participants.filter((p) => p.id !== userId)
+    io.to(roomCode).emit('participants-update', roomInfo(room))
+    const target = io.sockets.sockets.get(userId)
+    if (target) target.disconnect(true)
+    console.log(`Participant ${userId} removed from room ${roomCode}`)
+  })
+
   socket.on('disconnect', () => {
     const roomCode = (socket as any).roomCode
     if (!roomCode) return
