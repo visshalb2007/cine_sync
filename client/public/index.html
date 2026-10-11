@@ -181,18 +181,26 @@
     <script type="module">
       import { io } from 'https://cdn.socket.io/4.7.2/socket.io.esm-browser.min.js';
 
-let storedPlaybackState: any = {
-    positionMs: 0,
-    serverTimestampMs: 0,
-    rate: 1,
-    status: 'paused'
-  };
+      let clockOffset = 0; // serverTime - clientTime
+      let lastSyncAt = 0;
+      let playbackRate = 1; // from playback state
 
-async function syncClock() {
+      // Drift detection tracking variables
+      let lastDriftThreshold = 0;
+      let consecutiveDriftBeyondThreshold = 0;
+
+      // Stored latest playback state from server
+      let storedPlaybackState: any = {
+        positionMs: 0,
+        serverTimestampMs: 0,
+        rate: 1,
+        status: 'paused'
+      };
+
+      async function syncClock() {
         const clientSendTime = Date.now();
         socket.emit('client-hello', { clientTime: clientSendTime });
 
-        // Wait for sync-ack (with small timeout)
         await new Promise<void>((resolve) => {
           const timeout = setTimeout(() => {
             resolve();
@@ -201,12 +209,7 @@ async function syncClock() {
             clearTimeout(timeout);
             const serverTime = data.serverTime;
             const roundTrip = clientSendTime - serverTime;
-            clockOffset = roundTrip / 2; // serverTime ≈ clientTime + offset, so offset = (serverTime - clientTime)
-            // Actually: roundTrip = clientSendTime - serverTime
-            // offset = (serverTime - clientTime) 
-            // roundTrip = clientTimeAtSend - serverTimeAtReceive
-            // For NTP: offset = (serverReceive - clientSend + serverSend - clientRecv) / 2
-            // Simplified: offset ≈ -roundTrip/2 when server time is close to client time
+            clockOffset = roundTrip / 2;
             lastSyncAt = Date.now();
           });
         });
@@ -238,38 +241,10 @@ async function syncClock() {
         socket = io();
 
         socket.on('join-room', { roomCode, name: userName });
-      const playPauseBtn = document.getElementById('playPause') as HTMLButtonElement;
-      const seekForwardBtn = document.getElementById('seekForward') as HTMLButtonElement;
-      const seekBackwardBtn = document.getElementById('seekBackward') as HTMLButtonElement;
-      const rateSpan = document.querySelector('.rate') as HTMLSpanElement;
-      const chat = document.getElementById('chat') as HTMLDivElement;
-      const chatInput = document.getElementById('chatInput') as HTMLInputElement;
-      const emojiPanel = document.getElementById('emojiPanel') as HTMLElement;
-      const sidebar = document.getElementById('sidebar') as HTMLElement;
-      const roomCodeDiv = document.getElementById('roomCode') as HTMLDivElement;
-      const participantsDiv = document.getElementById('participants') as HTMLDivElement;
-
-      let socket: any;
-      let clientSeq = 0;
-      let baseVersion = 0;
-      let isPlaying = false;
-      let userName = '';
-
-      async function init() {
-        // Prompt for name
-        userName = prompt('Enter your name:') || 'Anonymous';
-        if (!userName) userName = 'Anonymous';
-
-        // Create or join room
-        const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-        
-        socket = io();
-
-        socket.emit('join-room', { roomCode, name: userName });
 
         socket.on('room-snapshot', (data: any) => {
           // Load video
-          video.src = `/watch/${data.playbackState.videoId}`; // Will be set by movie discovery
+          video.src = '/watch/' + data.playbackState.videoId;
           
           // Set initial position
           video.currentTime = data.playbackState.positionMs / 1000;
@@ -278,8 +253,13 @@ async function syncClock() {
             video.play();
           }
           
+          // Store playback state and update UI
+          storedPlaybackState = data.playbackState;
+          playbackRate = data.playbackState.rate;
+          rateSpan.textContent = playbackRate.toFixed(1) + 'x';
+          
           // Update UI
-          roomCodeDiv.textContent = `Room: ${data.roomCode}`;
+          roomCodeDiv.textContent = 'Room: ' + data.roomCode;
           
           // Update participants
           updateParticipants(data.participants);
@@ -292,7 +272,9 @@ async function syncClock() {
         socket.on('state-update', (data: any) => {
           const { playbackState, version } = data;
           baseVersion = version;
+          storedPlaybackState = playbackState;
           playbackRate = playbackState.rate;
+          rateSpan.textContent = playbackRate.toFixed(1) + 'x';
           
           // Compute expected position using server timeline
           const serverNow = Date.now() + clockOffset; // approximate server time
@@ -419,9 +401,7 @@ async function syncClock() {
         }
       });
 
-      init();
-
-      // Drift detection loop - check every 2 seconds
+      // Drift detection & correction loop - check every 2 seconds
       setInterval(() => {
         if (!video.src) return;
         
@@ -433,20 +413,45 @@ async function syncClock() {
         const actual = video.currentTime * 1000;
         const drift = actual - expected;
         
-        // Log drift for monitoring (can be sent to server)
-        if (Math.abs(drift) > 100) {
-          // Drift exceeds dead zone - could trigger correction
-          console.log(`Drift: ${drift}ms (expected: ${expected}ms, actual: ${actual}ms)`);
+        // Hysteresis: only act if drift stays beyond threshold for 2 consecutive checks
+        if (Math.abs(drift) > lastDriftThreshold) {
+          consecutiveDriftBeyondThreshold++;
+        } else {
+          consecutiveDriftBeyondThreshold = 0;
+        }
+        lastDriftThreshold = Math.abs(drift);
+        
+        // Apply correction based on drift magnitude and hysteresis
+        if (consecutiveDriftBeyondThreshold >= 2) {
+          if (Math.abs(drift) < 100) {
+            // Dead zone: ignore, reset hysteresis
+            consecutiveDriftBeyondThreshold = 0;
+            lastDriftThreshold = 0;
+          } else if (Math.abs(drift) > 500) {
+            // Hard seek: move to expected position
+            video.currentTime = expected / 1000;
+            consecutiveDriftBeyondThreshold = 0;
+            lastDriftThreshold = 0;
+          } else {
+            // Soft correction: adjust playbackRate toward 1.0
+            const driftDirection = drift > 0 ? 1 : -1;
+            playbackRate += driftDirection * 0.02; // 2% adjustment per check
+            // Clamp playbackRate to reasonable bounds
+            playbackRate = Math.max(0.5, Math.min(1.5, playbackRate));
+            // Apply adjusted rate to video
+            video.playbackRate = playbackRate;
+            // Update UI display
+            rateSpan.textContent = playbackRate.toFixed(1) + 'x';
+          }
+        }
+        
+        // Log drift for monitoring
+        if (Math.abs(drift) > 100 && consecutiveDriftBeyondThreshold >= 2) {
+          console.log(`Drift: ${drift}ms (expected: ${expected}ms, actual: ${actual}ms), rate: ${playbackRate.toFixed(2)}x`);
         }
       }, 2000);
 
-      // Handle periodic server time updates for clock re-sync
-      socket.on('server-time', (data: any) => {
-        const clientReceiveTime = Date.now();
-        const roundTrip = clientReceiveTime - data.serverTime;
-        clockOffset = roundTrip / 2;
-        lastSyncAt = clientReceiveTime;
-      });
+      init();
     </script>
   </body>
 </html>
