@@ -17,7 +17,9 @@ try {
   a.emit('join-room', { roomCode: '', name: 'SmokeHost' });
   const snap = await once(a, 'room-snapshot');
   if (!snap.roomCode) throw new Error('snapshot missing roomCode');
+  if (!snap.playbackState.videoId) throw new Error('new room has no default video');
   console.log('PASS join: room', snap.roomCode, 'participants', snap.participants.length);
+  console.log('PASS default shared video:', snap.playbackState.videoId.slice(0, 60) + '...');
 
   b.emit('join-room', { roomCode: snap.roomCode, name: 'SmokeGuest' });
   const snapB = await once(b, 'room-snapshot');

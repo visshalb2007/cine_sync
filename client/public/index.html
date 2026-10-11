@@ -74,6 +74,15 @@
         position: absolute; font-size: 28px; pointer-events: none;
         animation: floatUp 3s ease-out forwards; z-index: 50;
       }
+      #noVideoHint {
+        position: absolute; inset: 0; display: none;
+        align-items: center; justify-content: center; text-align: center;
+        color: #aaa; font-size: 14px; padding: 20px; pointer-events: none;
+      }
+      #errBar {
+        display: none; background: #7f1d1d; color: #fecaca;
+        padding: 8px 12px; border-radius: 8px; font-size: 13px;
+      }
       @keyframes floatUp {
         0% { opacity: 1; transform: translateY(0); }
         100% { opacity: 0; transform: translateY(-120px); }
@@ -141,8 +150,10 @@
 
       <div class="main">
         <div class="video-wrap" id="videoWrap">
-          <video id="video" playsinline controls></video>
+          <video id="video" playsinline controls preload="metadata"></video>
+          <div id="noVideoHint">No shared video loaded.<br />Pick a sample below or paste a video URL and press “Set video”.</div>
         </div>
+        <div id="errBar"></div>
         <div class="controls">
           <button id="playPause">Play</button>
           <button id="seekBack">-10s</button>
@@ -154,7 +165,9 @@
         <div class="row">
           <input id="setVideoInput" type="text" placeholder="Set shared video URL (host)" />
           <button id="setVideoBtn">Set video</button>
-          <button id="sampleBtn">Load sample</button>
+          <button class="sample-btn" data-sample="bbb">Big Buck Bunny</button>
+          <button class="sample-btn" data-sample="elephants">Elephants Dream</button>
+          <button class="sample-btn" data-sample="sintel">Sintel</button>
           <label class="status" style="cursor:pointer">Open local file
             <input id="fileInput" type="file" accept="video/*" style="display:none" />
           </label>
@@ -188,6 +201,15 @@
       const pollEl = $('poll'), pollQInput = $('pollQInput'), pollOptsInput = $('pollOptsInput');
       const setVideoInput = $('setVideoInput');
       const overlay = $('joinOverlay'), nameInput = $('nameInput'), codeInput = $('codeInput'), joinError = $('joinError');
+      const noVideoHint = $('noVideoHint'), errBar = $('errBar');
+      let errTimer = null;
+
+      function showError(msg) {
+        errBar.textContent = msg;
+        errBar.style.display = 'block';
+        if (errTimer) clearTimeout(errTimer);
+        errTimer = setTimeout(() => { errBar.style.display = 'none'; }, 4000);
+      }
 
       // ---------- State ----------
       let socket = null;
@@ -200,7 +222,11 @@
       let lastDriftAbs = 0, consecutiveBeyond = 0;
       let activePoll = null;
 
-      const SAMPLE_URL = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+      const SAMPLES = {
+        bbb: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+        elephants: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+        sintel: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4'
+      };
 
       function setConn(text, cls) {
         connStatus.textContent = text;
@@ -288,8 +314,10 @@
         socket.on('host-transfer', () => addChat('System', 'Host transferred.', false));
 
         socket.on('error', (data) => {
-          if (!joined) joinError.textContent = (data && data.message) || 'Error joining room';
-          else console.warn('server error:', data && data.message);
+          const msg = (data && data.message) || 'Server error';
+          if (!joined) joinError.textContent = msg;
+          else showError(msg);
+          console.warn('server error:', msg);
         });
 
         // periodic clock re-sync
@@ -308,12 +336,24 @@
         }
       }
 
+      function updateNoVideoHint() {
+        const hasSrc = !!(video.currentSrc || video.src) && !video.src.endsWith(location.pathname);
+        noVideoHint.style.display = (!storedState.videoId && !hasSrc) ? 'flex' : 'none';
+      }
+
+      video.addEventListener('error', () => {
+        const err = video.error;
+        if (err && video.src) showError('Video failed to load (code ' + err.code + '). Check the URL or try a sample.');
+        updateNoVideoHint();
+      });
+
       function applyState(ps, hard) {
         storedState = ps;
         playbackRate = ps.rate || 1;
         video.playbackRate = playbackRate;
         rateLabel.textContent = Number(playbackRate).toFixed(1) + 'x';
         loadVideoSource(ps.videoId);
+        updateNoVideoHint();
         const expected = ps.status === 'paused'
           ? ps.positionMs
           : ps.positionMs + (serverNow() - ps.serverTimestampMs) * playbackRate;
@@ -521,9 +561,20 @@
         socket.emit('change-video', { videoId: v, clientSeq, baseVersion, userId: socket.id });
       });
 
-      $('sampleBtn').addEventListener('click', () => {
-        video.src = SAMPLE_URL;
-        video.play().catch(() => {});
+      document.querySelectorAll('.sample-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const url = SAMPLES[btn.dataset.sample];
+          if (!url) return;
+          if (!joined) { // not in a room yet: preview locally
+            video.src = url;
+            video.play().catch(() => {});
+            updateNoVideoHint();
+            return;
+          }
+          // Share with the whole room (host-only on the server)
+          clientSeq++;
+          socket.emit('change-video', { videoId: url, clientSeq, baseVersion, userId: socket.id });
+        });
       });
 
       $('fileInput').addEventListener('change', (e) => {

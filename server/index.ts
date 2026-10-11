@@ -24,6 +24,17 @@ app.get('/health', (_req, res) => {
 app.get('/', (_req, res) => {
   res.sendFile(path.join(clientDir, 'index.html'))
 })
+// Resolve bare video ids (legacy + playlist entries) to streamable URLs.
+app.get('/watch/:id', (req, res) => {
+  const id = String(req.params.id ?? '')
+  if (/^https?:\/\//i.test(id)) return res.redirect(id)
+  const sample = SAMPLES[id]
+  if (sample) return res.redirect(sample.url)
+  res.status(404).json({ error: 'unknown video id', samples: Object.keys(SAMPLES) })
+})
+app.get('/api/samples', (_req, res) => {
+  res.json(SAMPLES)
+})
 const io = new Server(httpServer, {
   cors: {
     origin: '*',
@@ -70,6 +81,24 @@ type Room = {
 const rooms = new Map<string, Room>()
 const gracePeriod = 60000 // 60 seconds
 
+// Built-in sample streams so a fresh room has something to watch immediately.
+// Full URLs are stored as videoId; bare ids resolve via /watch/:id below.
+const SAMPLES: Record<string, { title: string; url: string }> = {
+  bbb: {
+    title: 'Big Buck Bunny (sample)',
+    url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+  },
+  elephants: {
+    title: 'Elephants Dream (sample)',
+    url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+  },
+  sintel: {
+    title: 'Sintel (sample)',
+    url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
+  },
+}
+const DEFAULT_VIDEO = SAMPLES.bbb.url
+
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id)
 
@@ -107,7 +136,7 @@ io.on('connection', (socket) => {
         hostId: socket.id,
         participants: [],
         playbackState: {
-          videoId: '',
+          videoId: DEFAULT_VIDEO,
           status: 'paused',
           positionMs: 0,
           serverTimestampMs: Date.now(),
