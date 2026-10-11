@@ -130,7 +130,7 @@
           <input id="videoTitleInput" type="text" placeholder="Video title" />
         </div>
         <div class="row" style="margin-top:6px">
-          <input id="videoUrlInput" type="text" placeholder="Video URL or id" />
+          <input id="videoUrlInput" type="text" placeholder="Direct MP4/WebM URL (not YouTube)" />
         </div>
         <div class="row" style="margin-top:6px">
           <button id="addVideoBtn">Add to playlist</button>
@@ -161,9 +161,10 @@
           <span class="rate" id="rateLabel">1.0x</span>
           <span class="status" id="driftLabel">drift: —</span>
           <span class="status" id="clockLabel">sync: —</span>
+          <span class="status warn" id="modeLabel"></span>
         </div>
         <div class="row">
-          <input id="setVideoInput" type="text" placeholder="Set shared video URL (host)" />
+          <input id="setVideoInput" type="text" placeholder="Set shared direct MP4/WebM URL — not YouTube (host)" />
           <button id="setVideoBtn">Set video</button>
           <button class="sample-btn" data-sample="flower">Flower</button>
           <button class="sample-btn" data-sample="bbb">Buck Bunny</button>
@@ -201,7 +202,7 @@
       const pollEl = $('poll'), pollQInput = $('pollQInput'), pollOptsInput = $('pollOptsInput');
       const setVideoInput = $('setVideoInput');
       const overlay = $('joinOverlay'), nameInput = $('nameInput'), codeInput = $('codeInput'), joinError = $('joinError');
-      const noVideoHint = $('noVideoHint'), errBar = $('errBar');
+      const noVideoHint = $('noVideoHint'), errBar = $('errBar'), modeLabel = $('modeLabel');
       let errTimer = null;
 
       function showError(msg) {
@@ -333,18 +334,33 @@
       }
 
       // ---------- Playback ----------
+      // Local-file mode: user picked their own file. Positional sync still
+      // applies, but state updates must NOT overwrite the blob: source.
+      let localMode = false;
+
+      function resolveSrc(videoId) {
+        if (!videoId) return '';
+        if (/^(https?:\/\/|blob:|data:)/i.test(videoId) || videoId.startsWith('/')) return videoId;
+        return '/watch/' + videoId; // bare ids only
+      }
+
       function loadVideoSource(videoId) {
-        if (!videoId) return;
-        // Accept full URLs directly; bare ids use the legacy /watch/ path
-        const src = /^https?:\/\//i.test(videoId) ? videoId : '/watch/' + videoId;
-        if (video.src !== src && !video.src.endsWith(encodeURI(src))) {
+        if (!videoId || localMode) return;
+        const src = resolveSrc(videoId);
+        let current = '';
+        try { current = new URL(video.src, location.href).href; } catch (e) {}
+        let target = '';
+        try { target = new URL(src, location.href).href; } catch (e) { return; }
+        if (current !== target) {
           try { video.src = src; } catch (e) { console.warn('video load failed', e); }
         }
       }
 
       function updateNoVideoHint() {
         const hasSrc = !!(video.currentSrc || video.src) && !video.src.endsWith(location.pathname);
-        noVideoHint.style.display = (!storedState.videoId && !hasSrc) ? 'flex' : 'none';
+        const show = !localMode && !storedState.videoId && !hasSrc;
+        noVideoHint.style.display = show ? 'flex' : 'none';
+        modeLabel.textContent = localMode ? 'local file — same file needed on all screens' : '';
       }
 
       video.addEventListener('error', () => {
@@ -580,6 +596,8 @@
           showError('That looks like a watch-page link (YouTube etc.) — those cannot stream. Paste a direct MP4/WebM URL.');
           return;
         }
+        localMode = false;
+        updateNoVideoHint();
         clientSeq++;
         socket.emit('change-video', { videoId: v, clientSeq, baseVersion, userId: socket.id });
       });
@@ -595,6 +613,8 @@
             return;
           }
           // Share with the whole room (host-only on the server)
+          localMode = false;
+          updateNoVideoHint();
           clientSeq++;
           socket.emit('change-video', { videoId: url, clientSeq, baseVersion, userId: socket.id });
         });
@@ -603,8 +623,11 @@
       $('fileInput').addEventListener('change', (e) => {
         const f = e.target.files && e.target.files[0];
         if (!f) return;
-        video.src = URL.createObjectURL(f);
+        localMode = true; // keep shared state from overwriting our file
+        try { video.src = URL.createObjectURL(f); } catch (err) { showError('Could not open that file.'); return; }
         video.play().catch(() => {});
+        updateNoVideoHint();
+        addChat('System', 'Local file mode: "' + f.name + '". Everyone must open the same file; play/pause/seek stay in sync.', false);
       });
 
       // ---------- Join ----------

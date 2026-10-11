@@ -30,6 +30,11 @@ app.get('/watch/:id', (req, res) => {
   if (/^https?:\/\//i.test(id)) return res.redirect(id)
   const sample = SAMPLES[id]
   if (sample) return res.redirect(sample.url)
+  // Allow media filenames (e.g. flower.mp4) without path traversal
+  if (/^[A-Za-z0-9._-]+\.mp4$/i.test(id)) {
+    const file = path.join(clientDir, 'media', path.basename(id))
+    if (fs.existsSync(file)) return res.redirect(`/media/${path.basename(id)}`)
+  }
   res.status(404).json({ error: 'unknown video id', samples: Object.keys(SAMPLES) })
 })
 app.get('/api/samples', (_req, res) => {
