@@ -181,10 +181,14 @@
     <script type="module">
       import { io } from 'https://cdn.socket.io/4.7.2/socket.io.esm-browser.min.js';
 
-      let clockOffset = 0; // serverTime - clientTime
-      let lastSyncAt = 0;
+let storedPlaybackState: any = {
+    positionMs: 0,
+    serverTimestampMs: 0,
+    rate: 1,
+    status: 'paused'
+  };
 
-      async function syncClock() {
+async function syncClock() {
         const clientSendTime = Date.now();
         socket.emit('client-hello', { clientTime: clientSendTime });
 
@@ -288,9 +292,23 @@
         socket.on('state-update', (data: any) => {
           const { playbackState, version } = data;
           baseVersion = version;
+          playbackRate = playbackState.rate;
           
-          // Sync video
-          video.currentTime = playbackState.positionMs / 1000;
+          // Compute expected position using server timeline
+          const serverNow = Date.now() + clockOffset; // approximate server time
+          let expected;
+          if (playbackState.status === 'paused') {
+            expected = playbackState.positionMs;
+          } else {
+            expected = playbackState.positionMs + (serverNow - playbackState.serverTimestampMs) * playbackRate;
+          }
+          
+          // Reconcile video position
+          const actual = video.currentTime * 1000; // in ms
+          const drift = actual - expected;
+          
+          // Apply position with drift correction logic
+          video.currentTime = expected / 1000;
           
           if (playbackState.status === 'playing' && !isPlaying) {
             video.play();
@@ -402,6 +420,25 @@
       });
 
       init();
+
+      // Drift detection loop - check every 2 seconds
+      setInterval(() => {
+        if (!video.src) return;
+        
+        const serverNow = Date.now() + clockOffset;
+        const expected = storedPlaybackState.rate > 0 
+          ? storedPlaybackState.positionMs + (serverNow - storedPlaybackState.serverTimestampMs) * storedPlaybackState.rate
+          : storedPlaybackState.positionMs;
+        
+        const actual = video.currentTime * 1000;
+        const drift = actual - expected;
+        
+        // Log drift for monitoring (can be sent to server)
+        if (Math.abs(drift) > 100) {
+          // Drift exceeds dead zone - could trigger correction
+          console.log(`Drift: ${drift}ms (expected: ${expected}ms, actual: ${actual}ms)`);
+        }
+      }, 2000);
 
       // Handle periodic server time updates for clock re-sync
       socket.on('server-time', (data: any) => {
