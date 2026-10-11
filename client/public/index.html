@@ -946,6 +946,9 @@
         rateLabel.textContent = playbackRate.toFixed(1) + 'x';
         speedLabel.textContent = (Number.isInteger(userRate) ? userRate : userRate.toFixed(2).replace(/0$/, '')) + 'x';
       }
+      function paintSpeedMenu() {
+        speedMenu.querySelectorAll('.speed-opt').forEach((o) => o.classList.toggle('current', parseFloat(o.dataset.rate) === userRate));
+      }
 
       // Speed menu
       const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
@@ -963,9 +966,15 @@
         userRate = parseFloat(b.dataset.rate);
         rateCorr = 1; // deliberate choice resets accumulated correction
         paintRate();
-        speedMenu.querySelectorAll('.speed-opt').forEach((o) => o.classList.toggle('current', parseFloat(o.dataset.rate) === userRate));
+        paintSpeedMenu();
         speedMenu.classList.remove('show');
         consecutiveBeyond = 0; lastDriftAbs = 0;
+        // Share with the room so everyone plays at this speed
+        // (permissions follow the room control toggle; rejections revert via error handler).
+        if (joined && socket) {
+          clientSeq++;
+          socket.emit('set-rate', { rate: userRate, clientSeq, baseVersion });
+        }
       });
       document.addEventListener('click', (e) => {
         if (!e.target.closest || (!e.target.closest('#speedMenu') && !e.target.closest('#speedBtn'))) speedMenu.classList.remove('show');
@@ -1254,8 +1263,12 @@
 
       function applyState(ps, hard) {
         storedState = ps;
+        // Server is the source of truth for speed: adopt it (covers remote
+        // changes, echoes of our own choice, and revert after rejections).
+        userRate = ps.rate || 1;
         if (hard) rateCorr = 1; // fresh position: drop accumulated correction
         paintRate();
+        paintSpeedMenu();
         loadVideoSource(ps.videoId);
         updateNoVideoHint();
         const expected = ps.status === 'paused'

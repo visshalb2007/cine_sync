@@ -92,8 +92,17 @@ try {
   const ch = await waitForUpdate((d) => d.playbackState.videoId === 'https://example.com/v.mp4', 'change-video');
   console.log('PASS change-video propagates');
 
+  a.emit('set-rate', { rate: 1.5, clientSeq: 5, baseVersion: ch.version });
+  const rated = await waitForUpdate((d) => d.playbackState.rate === 1.5, 'set-rate');
+  console.log('PASS set-rate syncs to room, version', rated.version);
+  const badRate = once(a, 'error');
+  a.emit('set-rate', { rate: 9, clientSeq: 6, baseVersion: rated.version });
+  const badErr = await badRate;
+  if (!/0\.25.*2\.5/.test(badErr.message)) throw new Error('bad rate not rejected: ' + JSON.stringify(badErr));
+  console.log('PASS invalid rate rejected:', badErr.message);
+
   const rB = once(b, 'reaction');
-  a.emit('reaction', { emoji: '🔥', clientSeq: 4, baseVersion: ch.version, userId: a.id });
+  a.emit('reaction', { emoji: '🔥', clientSeq: 4, baseVersion: rated.version, userId: a.id });
   await rB;
   console.log('PASS reaction broadcast');
 
