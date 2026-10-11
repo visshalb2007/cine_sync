@@ -120,8 +120,14 @@
     <div class="app">
       <div class="sidebar">
         <h2>Room</h2>
-        <div class="room-code" id="roomCode">------</div>
+        <div class="room-code" id="roomCode" title="Click to copy invite link">------</div>
         <div id="connStatus" class="status">connecting…</div>
+        <div class="status" id="watchCount"></div>
+        <h3>Room controls</h3>
+        <label class="status" style="display:flex;gap:6px;align-items:center;cursor:pointer">
+          <input type="checkbox" id="controlToggle" checked /> Everyone can control
+        </label>
+        <div class="status" id="controlNote"></div>
         <h3>Participants</h3>
         <div id="participants"></div>
         <h3>Playlist</h3>
@@ -203,6 +209,7 @@
       const setVideoInput = $('setVideoInput');
       const overlay = $('joinOverlay'), nameInput = $('nameInput'), codeInput = $('codeInput'), joinError = $('joinError');
       const noVideoHint = $('noVideoHint'), errBar = $('errBar'), modeLabel = $('modeLabel');
+      const controlToggle = $('controlToggle'), controlNote = $('controlNote'), watchCount = $('watchCount');
       let errTimer = null;
 
       function showError(msg) {
@@ -215,7 +222,7 @@
       // ---------- State ----------
       let socket = null;
       let joined = false;
-      let myName = '', myRoomCode = '';
+      let myName = '', myRoomCode = '', myHostId = null, myEveryoneCanControl = true;
       let clientSeq = 0, baseVersion = 0, isPlaying = false;
       let clockOffset = 0, lastSyncAt = 0;
       let playbackRate = 1;
@@ -288,9 +295,26 @@
           applyState(data.playbackState, true);
         });
 
-        socket.on('participants-update', (data) => {
-          renderParticipants(data.participants || []);
+        function applyRoomMeta(data) {
+          if (!data) return;
           if (data.roomCode) { myRoomCode = data.roomCode; roomCodeEl.textContent = myRoomCode; }
+          if ('hostId' in data) myHostId = data.hostId;
+          if ('everyoneCanControl' in data) {
+            myEveryoneCanControl = data.everyoneCanControl !== false;
+            controlToggle.checked = myEveryoneCanControl;
+          }
+          renderControlNote();
+        }
+
+        socket.on('participants-update', (data) => {
+          applyRoomMeta(data);
+          renderParticipants(data.participants || []);
+        });
+
+        socket.on('room-settings', (data) => {
+          applyRoomMeta(data);
+          renderParticipants(lastParticipants);
+          addChat('System', data.everyoneCanControl ? 'Everyone can now control playback.' : 'Only the host can control playback now.', false);
         });
 
         socket.on('state-update', (data) => {
@@ -318,7 +342,12 @@
           }
         });
 
-        socket.on('host-transfer', () => addChat('System', 'Host transferred.', false));
+        socket.on('host-transfer', (data) => {
+          if (data && data.newHostId) myHostId = data.newHostId;
+          renderControlNote();
+          renderParticipants(lastParticipants);
+          addChat('System', 'Host transferred.', false);
+        });
 
         socket.on('error', (data) => {
           const msg = (data && data.message) || 'Server error';
@@ -388,7 +417,12 @@
         const expected = ps.status === 'paused'
           ? ps.positionMs
           : ps.positionMs + (serverNow() - ps.serverTimestampMs) * playbackRate;
-        if (hard || Math.abs(video.currentTime * 1000 - expected) > 40 || !isFinite(video.currentTime)) {
+        // Re-seek only when meaningfully off (120ms keeps us inside the
+        // 100ms dead zone's spirit and avoids seek churn on every update).
+        // Never fight the player while it is seeking or still buffering.
+        if (hard || video.seeking || video.readyState < 3) {
+          if (hard) { try { video.currentTime = Math.max(0, expected / 1000); } catch (e) {} }
+        } else if (Math.abs(video.currentTime * 1000 - expected) > 120 || !isFinite(video.currentTime)) {
           try { video.currentTime = Math.max(0, expected / 1000); } catch (e) {}
         }
         if (ps.status === 'playing' && !isPlaying) {
@@ -405,6 +439,11 @@
         overlay.style.display = 'none';
         myRoomCode = data.roomCode || myRoomCode;
         roomCodeEl.textContent = myRoomCode || '------';
+        if ('hostId' in data) myHostId = data.hostId;
+        if ('everyoneCanControl' in data) {
+          myEveryoneCanControl = data.everyoneCanControl !== false;
+          controlToggle.checked = myEveryoneCanControl;
+        }
         baseVersion = data.version || 0;
         renderParticipants(data.participants || []);
         renderPlaylist(data.playlist || []);
@@ -424,13 +463,29 @@
         driftLabel.textContent = 'drift: ' + Math.round(drift) + 'ms';
         driftLabel.className = 'status' + (abs < 100 ? ' ok' : abs <= 500 ? ' warn' : ' err');
 
-        if (abs > lastDriftAbs) consecutiveBeyond++; else consecutiveBeyond = 0;
-        lastDriftAbs = abs;
-        if (consecutiveBeyond < 2 || storedState.status === 'paused') {
+        // Don't fight the player: skip correction while paused, seeking,
+        // stalled (buffering), or when the browser hasn't enough data yet.
+        if (storedState.status === 'paused' || video.paused || video.seeking || video.readyState < 3) {
           if (abs < 100) { consecutiveBeyond = 0; lastDriftAbs = 0; }
           return;
         }
-        if (abs < 100) { consecutiveBeyond = 0; lastDriftAbs = 0; }
+        if (abs > lastDriftAbs) consecutiveBeyond++; else consecutiveBeyond = 0;
+        lastDriftAbs = abs;
+        if (consecutiveBeyond < 2) {
+          if (abs < 100) { consecutiveBeyond = 0; lastDriftAbs = 0; }
+          return;
+        }
+        if (abs < 100) {
+          // Back in the dead zone: ease the local rate back to the room rate
+          // so soft-correction residue doesn't accumulate into oscillation.
+          consecutiveBeyond = 0; lastDriftAbs = 0;
+          const target = storedState.rate || 1;
+          if (Math.abs(playbackRate - target) > 0.005) {
+            playbackRate += (target - playbackRate) * 0.5;
+            video.playbackRate = playbackRate;
+            rateLabel.textContent = playbackRate.toFixed(1) + 'x';
+          }
+        }
         else if (abs > 500) {
           try { video.currentTime = Math.max(0, expected / 1000); } catch (e) {}
           consecutiveBeyond = 0; lastDriftAbs = 0;
@@ -442,15 +497,36 @@
         }
       }, 2000);
 
+      // Buffering indicator so stalls read as "loading", not "broken"
+      video.addEventListener('waiting', () => { driftLabel.textContent = 'buffering…'; driftLabel.className = 'status warn'; });
+      video.addEventListener('playing', () => { consecutiveBeyond = 0; lastDriftAbs = 0; });
+
       // ---------- UI render ----------
+      let lastParticipants = [];
+
+      function isHost() { return !!(socket && myHostId && socket.id === myHostId); }
+
+      function renderControlNote() {
+        controlToggle.disabled = !isHost();
+        controlNote.textContent = isHost()
+          ? (myEveryoneCanControl ? 'You are host · everyone can control' : 'You are host · host-only control')
+          : (myEveryoneCanControl ? 'Everyone can control playback' : 'Host-only control — ask the host');
+      }
+
       function renderParticipants(list) {
+        lastParticipants = list || [];
         const me = socket ? socket.id : '';
-        participantsEl.innerHTML = list.map((p) =>
+        watchCount.textContent = lastParticipants.length
+          ? lastParticipants.length + (lastParticipants.length === 1 ? ' person watching' : ' people watching')
+          : '';
+        participantsEl.innerHTML = lastParticipants.map((p) =>
           '<div class="participant">' +
           '<span class="dot"></span><span>' + escapeHtml(p.name) + '</span>' +
           (p.id === me ? '<span class="host-badge">YOU</span>' : '') +
+          (p.id === myHostId ? '<span class="host-badge">HOST</span>' : '') +
           '</div>'
         ).join('');
+        renderControlNote();
       }
 
       function renderPlaylist(list) {
@@ -628,6 +704,27 @@
         video.play().catch(() => {});
         updateNoVideoHint();
         addChat('System', 'Local file mode: "' + f.name + '". Everyone must open the same file; play/pause/seek stay in sync.', false);
+      });
+
+      controlToggle.addEventListener('change', () => {
+        if (!joined || !socket) return;
+        // Only the host's toggle is enabled; server enforces this too.
+        socket.emit('toggle-control', { open: controlToggle.checked, userId: socket.id });
+      });
+
+      roomCodeEl.addEventListener('click', () => {
+        if (!myRoomCode) return;
+        const base = location.protocol.startsWith('http') ? location.origin : 'http://localhost:3000';
+        const link = base + '/?code=' + myRoomCode;
+        const done = () => {
+          roomCodeEl.style.background = '#1d4ed8';
+          setTimeout(() => { roomCodeEl.style.background = ''; }, 800);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(link).then(done, () => { window.prompt('Copy invite link:', link); });
+        } else {
+          window.prompt('Copy invite link:', link);
+        }
       });
 
       // ---------- Join ----------

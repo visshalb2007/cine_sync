@@ -38,8 +38,32 @@ try {
   if (chat.text !== 'hello world') throw new Error('chat sanitize failed: ' + chat.text);
   console.log('PASS chat echo + sanitize:', JSON.stringify(chat.text));
 
+  // Guest (non-host) can pause: everyoneCanControl defaults to true.
+  // Guest saw version 1 via the earlier broadcast, so it is not stale.
+  const pauseA = once(a, 'state-update');
+  b.emit('play-pause', { status: 'paused', clientSeq: 1, baseVersion: upd.version });
+  const paused = await pauseA;
+  if (paused.playbackState.status !== 'paused') throw new Error('guest pause not applied');
+  console.log('PASS guest pause works (everyone can control), version', paused.version);
+
+  // Host restricts to host-only: guest commands rejected
+  const setB = once(b, 'room-settings');
+  a.emit('toggle-control', { open: false, userId: a.id });
+  const settings = await setB;
+  if (settings.everyoneCanControl !== false) throw new Error('toggle-control not applied');
+  console.log('PASS host toggled host-only control');
+  const errB = once(b, 'error');
+  b.emit('play-pause', { status: 'playing', clientSeq: 2, baseVersion: paused.version });
+  const err = await errB;
+  if (!/host/i.test(err.message)) throw new Error('guest command not rejected: ' + JSON.stringify(err));
+  console.log('PASS guest rejected under host-only:', err.message);
+  const setB2 = once(b, 'room-settings');
+  a.emit('toggle-control', { open: true, userId: a.id });
+  await setB2;
+  console.log('PASS host re-opened control');
+
   const chB = once(b, 'state-update');
-  a.emit('change-video', { videoId: 'https://example.com/v.mp4', clientSeq: 3, baseVersion: upd.version, userId: a.id });
+  a.emit('change-video', { videoId: 'https://example.com/v.mp4', clientSeq: 3, baseVersion: paused.version, userId: a.id });
   const ch = await chB;
   if (ch.playbackState.videoId !== 'https://example.com/v.mp4') throw new Error('change-video not applied');
   console.log('PASS change-video propagates');

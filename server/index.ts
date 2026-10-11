@@ -70,6 +70,7 @@ type Room = {
   id: string
   code: string
   hostId: string | null
+  everyoneCanControl: boolean
   participants: Participant[]
   playbackState: {
     videoId: string
@@ -85,6 +86,24 @@ type Room = {
 
 const rooms = new Map<string, Room>()
 const gracePeriod = 60000 // 60 seconds
+
+// Who may issue control commands? Host always; everyone else only when the
+// room's "everyone can control" toggle is on (default true).
+function canControl(room: Room, socketId: string, userId?: string): boolean {
+  if (room.everyoneCanControl) return true
+  return room.hostId === socketId || (userId != null && room.hostId === userId)
+}
+
+// Shared room metadata included in snapshots and participant broadcasts
+function roomInfo(room: Room) {
+  return {
+    roomCode: room.code,
+    hostId: room.hostId,
+    everyoneCanControl: room.everyoneCanControl,
+    participants: room.participants,
+    version: room.version,
+  }
+}
 
 // Built-in sample videos, served same-origin from client/public/media/
 // (fetch with `npm run fetch-media`). Same-origin + local disk means rooms
@@ -131,6 +150,7 @@ io.on('connection', (socket) => {
         id: socket.id,
         code,
         hostId: socket.id,
+        everyoneCanControl: true,
         participants: [],
         playbackState: {
           videoId: DEFAULT_VIDEO,
@@ -160,18 +180,14 @@ io.on('connection', (socket) => {
         existingParticipant.joinedAt = Date.now() - (existingParticipant.joinedAt - (existingParticipant.leftAt ? existingParticipant.leftAt - existingParticipant.joinedAt : 0))
         
         // Broadcast updated participant list
-        io.to(room.code).emit('participants-update', {
-          participants: room.participants,
-          roomCode: room.code,
-        })
+        io.to(room.code).emit('participants-update', roomInfo(room))
 
         // Send snapshot resume from current version
         socket.join(room.code)
         ;(socket as any).roomCode = room.code
         socket.emit('room-snapshot-resume', {
-          roomCode: room.code,
+          ...roomInfo(room),
           playbackState: room.playbackState,
-          version: room.version,
         })
 
         console.log(`Participant ${cleanName} reconnected within grace period`)
@@ -198,20 +214,15 @@ io.on('connection', (socket) => {
     ;(socket as any).sessionToken = socket.id // session token is the socket id
 
     // Broadcast updated participant list
-    io.to(room.code).emit('participants-update', {
-      participants: room.participants,
-      roomCode: room.code,
-    })
+    io.to(room.code).emit('participants-update', roomInfo(room))
 
     // Send snapshot to new participant
     socket.emit('room-snapshot', {
-      roomCode: room.code,
-      version: room.version,
+      ...roomInfo(room),
       playbackState: room.playbackState,
       playlist: room.playbackState.playlist,
       activePoll: null,
       chatMessages: [],
-      participants: room.participants,
     })
 
     console.log(`Participant ${cleanName} joined room ${room.code}, total: ${room.participants.length}`)
@@ -248,17 +259,14 @@ io.on('connection', (socket) => {
       participant.leftAt = undefined
       
       // Broadcast updated participant list
-      io.to(foundRoom.code).emit('participants-update', {
-        participants: foundRoom.participants,
-        code: foundRoom.code,
-      })
-      
+      io.to(foundRoom.code).emit('participants-update', roomInfo(foundRoom))
+
       // Send snapshot resume from current version
       socket.join(foundRoom.code)
       ;(socket as any).roomCode = foundRoom.code
       socket.emit('room-snapshot-resume', {
+        ...roomInfo(foundRoom),
         playbackState: foundRoom.playbackState,
-        version: foundRoom.version,
       })
       
       console.log(`Participant ${socketId} reconnected within grace period`)
@@ -275,20 +283,17 @@ io.on('connection', (socket) => {
       foundRoom.participants.push(newParticipant)
       
       // Broadcast updated participant list
-      io.to(foundRoom.code).emit('participants-update', {
-        participants: foundRoom.participants,
-        code: foundRoom.code,
-      })
-      
+      io.to(foundRoom.code).emit('participants-update', roomInfo(foundRoom))
+
       // Send full snapshot
       socket.join(foundRoom.code)
       ;(socket as any).roomCode = foundRoom.code
       socket.emit('room-snapshot', {
+        ...roomInfo(foundRoom),
         playbackState: foundRoom.playbackState,
         playlist: foundRoom.playbackState.playlist,
         activePoll: null,
         chatMessages: [],
-        participants: foundRoom.participants,
       })
       
       console.log(`Participant ${socketId} re-joined after grace period expired`)
@@ -306,6 +311,11 @@ io.on('connection', (socket) => {
     // Validate baseVersion
     if (room.version !== baseVersion) {
       socket.emit('error', { message: 'Stale version, please reconnect state' })
+      return
+    }
+
+    if (!canControl(room, socket.id)) {
+      socket.emit('error', { message: 'Only the host can control playback right now' })
       return
     }
 
@@ -330,6 +340,11 @@ io.on('connection', (socket) => {
       return
     }
 
+    if (!canControl(room, socket.id)) {
+      socket.emit('error', { message: 'Only the host can control playback right now' })
+      return
+    }
+
     room.playbackState.positionMs = positionMs
     room.playbackState.serverTimestampMs = Date.now()
     room.version++
@@ -351,9 +366,8 @@ io.on('connection', (socket) => {
       return
     }
 
-    // Only host can change the video
-    if (room.hostId !== userId && room.hostId !== socket.id) {
-      socket.emit('error', { message: 'Only host can change the video' })
+    if (!canControl(room, socket.id, userId)) {
+      socket.emit('error', { message: 'Only the host can change the video right now' })
       return
     }
 
@@ -447,9 +461,8 @@ io.on('connection', (socket) => {
       return
     }
 
-    // Only host can add videos
-    if (room.hostId !== socket.id) {
-      socket.emit('error', { message: 'Only host can add videos' })
+    if (!canControl(room, socket.id, userId)) {
+      socket.emit('error', { message: 'Only the host can add videos right now' })
       return
     }
 
@@ -485,9 +498,8 @@ io.on('connection', (socket) => {
       return
     }
 
-    // Only host can remove videos
-    if (room.hostId !== socket.id) {
-      socket.emit('error', { message: 'Only host can remove videos' })
+    if (!canControl(room, socket.id, userId)) {
+      socket.emit('error', { message: 'Only the host can remove videos right now' })
       return
     }
 
@@ -515,9 +527,8 @@ socket.on('reorder-playlist', ({ itemIds, clientSeq, baseVersion, userId }: { it
       return
     }
 
-    // Only host can reorder playlist
-    if (room.hostId !== socket.id) {
-      socket.emit('error', { message: 'Only host can reorder playlist' })
+    if (!canControl(room, socket.id, userId)) {
+      socket.emit('error', { message: 'Only the host can reorder the playlist right now' })
       return
     }
 
@@ -548,9 +559,8 @@ socket.on('reorder-playlist', ({ itemIds, clientSeq, baseVersion, userId }: { it
     const room = rooms.get(roomCode)
     if (!room) return
 
-    // Only host can create polls
-    if (room.hostId !== socket.id) {
-      socket.emit('error', { message: 'Only host can create polls' })
+    if (!canControl(room, socket.id)) {
+      socket.emit('error', { message: 'Only the host can create polls right now' })
       return
     }
 
@@ -608,15 +618,34 @@ socket.on('reorder-playlist', ({ itemIds, clientSeq, baseVersion, userId }: { it
       return
     }
 
-    // Only host can close polls
-    if (room.hostId !== socket.id) {
-      socket.emit('error', { message: 'Only host can close polls' })
+    if (!canControl(room, socket.id, userId)) {
+      socket.emit('error', { message: 'Only the host can close polls right now' })
       return
     }
 
     io.to(roomCode).emit('poll-update', {
       type: 'close',
       pollId,
+    })
+  })
+
+  // Host-only toggle: whether everyone or only the host may control playback
+  socket.on('toggle-control', ({ open, userId }: { open: boolean; userId: string }) => {
+    const roomCode = (socket as any).roomCode
+    if (!roomCode) return
+
+    const room = rooms.get(roomCode)
+    if (!room) return
+
+    if (room.hostId !== socket.id && room.hostId !== userId) {
+      socket.emit('error', { message: 'Only the host can change room controls' })
+      return
+    }
+
+    room.everyoneCanControl = open !== false
+    io.to(roomCode).emit('room-settings', {
+      everyoneCanControl: room.everyoneCanControl,
+      hostId: room.hostId,
     })
   })
 
@@ -635,10 +664,7 @@ socket.on('reorder-playlist', ({ itemIds, clientSeq, baseVersion, userId }: { it
     }
 
     room.participants = room.participants.filter((p) => p.id !== socket.id)
-    io.to(roomCode).emit('participants-update', {
-      participants: room.participants,
-      roomCode,
-    })
+    io.to(roomCode).emit('participants-update', roomInfo(room))
 
     // If host disconnects, mark for auto-transfer after grace period
     if (room.hostId === socket.id) {
