@@ -391,6 +391,39 @@ io.on('connection', (socket) => {
     })
   })
 
+  socket.on('set-rate', ({ rate, baseVersion, clientSeq }: { rate: number; baseVersion: number; clientSeq: number }) => {
+    const roomCode = (socket as any).roomCode
+    if (!roomCode) return
+
+    const room = rooms.get(roomCode)
+    if (!room) return
+
+    if (room.version !== baseVersion) {
+      socket.emit('error', {
+        message: 'Stale version, resynced to latest state',
+        version: room.version,
+        playbackState: room.playbackState,
+      })
+      return
+    }
+
+    if (!canControl(room, socket.id)) {
+      socket.emit('error', { message: 'Only the host can change playback speed right now' })
+      return
+    }
+
+    const validRates = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0]
+    const clampedRate = validRates.includes(rate) ? rate : 1.0
+
+    room.playbackState.rate = clampedRate
+    room.playbackState.serverTimestampMs = Date.now()
+    room.version++
+    io.to(roomCode).emit('state-update', {
+      playbackState: room.playbackState,
+      version: room.version,
+    })
+  })
+
   socket.on('reaction', ({ emoji, baseVersion, clientSeq, userId }: { emoji: string; baseVersion: number; clientSeq: number; userId: string }) => {
     const roomCode = (socket as any).roomCode
     if (!roomCode) return

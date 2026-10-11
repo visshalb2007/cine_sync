@@ -4,36 +4,173 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CineSync - Watch Party</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=PT+Serif:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
     <style>
       * { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body, button, input, select, textarea {
+        font-family: 'PT Serif', system-ui, -apple-system, sans-serif;
+      }
       body {
-        font-family: system-ui, -apple-system, sans-serif;
         background: #111; color: #fff; min-height: 100vh;
       }
       .app { display: flex; min-height: 100vh; }
-      .sidebar { width: 280px; background: #222; padding: 20px; overflow-y: auto; flex-shrink: 0; }
-      .sidebar h2 {
-        margin-bottom: 12px; font-size: 18px;
-        border-bottom: 1px solid #444; padding-bottom: 10px;
+
+      /* ===== Sidebar ===== */
+      .sidebar {
+        width: 280px; flex-shrink: 0;
+        background: #1a1a1a; border-right: 1px solid #2a2a2a;
+        height: 100vh; max-height: 100vh;
+        display: flex; flex-direction: column;
+        overflow-y: auto; padding: 20px 16px 24px;
+        scrollbar-width: thin; scrollbar-color: #3a3a3a transparent;
       }
-      .sidebar h3 { margin: 16px 0 8px; font-size: 14px; color: #aaa; }
+      .sidebar::-webkit-scrollbar { width: 8px; }
+      .sidebar::-webkit-scrollbar-track { background: transparent; }
+      .sidebar::-webkit-scrollbar-thumb { background: #3a3a3a; border-radius: 4px; border: 2px solid transparent; background-clip: content-box; }
+      .sidebar::-webkit-scrollbar-thumb:hover { background: #4a4a4a; }
+
+      .sidebar .section { margin-top: 24px; }
+      .sidebar .section:first-child { margin-top: 0; }
+      .sidebar .section-title {
+        font-size: 12px; font-weight: 600; text-transform: uppercase;
+        letter-spacing: 0.08em; color: #9a9a9a; margin-bottom: 12px;
+      }
+
+      /* Header "Room" with divider */
+      .sidebar-header { display: flex; flex-direction: column; gap: 12px; }
+      .sidebar-header .room-title {
+        font-size: 18px; font-weight: 600; color: #fff;
+        padding-bottom: 10px; border-bottom: 1px solid #333;
+      }
+
+      /* Room code box */
       .room-code {
-        background: #333; padding: 8px 12px; margin: 10px 0;
-        font-family: monospace; font-size: 16px; color: #0f0;
-        border-radius: 4px; text-align: center; letter-spacing: 2px;
+        background: #1c1c1c; border: 1px solid #333; border-radius: 8px;
+        padding: 12px 16px; text-align: center; position: relative;
       }
-      .participant { display: flex; align-items: center; margin: 8px 0; font-size: 14px; }
-      .dot {
-        width: 8px; height: 8px; background: #0f0; border-radius: 50%;
-        margin-right: 8px; animation: pulse 1s infinite; flex-shrink: 0;
+      .room-code .code-value {
+        font-family: 'PT Serif', system-ui, sans-serif;
+        font-size: 18px; font-weight: 700; letter-spacing: 4px; color: #4ade80;
       }
-      @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-      .participant.offline .dot { background: #666; animation: none; }
-      .host-badge {
-        background: #b8860b; color: #111; font-size: 10px; font-weight: bold;
-        padding: 1px 6px; border-radius: 8px; margin-left: 6px;
+      .room-code .copy-btn {
+        position: absolute; top: 50%; right: 10px; transform: translateY(-50%);
+        width: 32px; height: 32px; border-radius: 6px;
+        background: transparent; border: 1px solid #333; color: #9a9a9a;
+        cursor: pointer; display: flex; align-items: center; justify-content: center;
+        transition: background 0.15s, border-color 0.15s, color 0.15s;
       }
+      .room-code .copy-btn:hover { background: #2a2a2a; border-color: #444; color: #fff; }
+      .room-code .copy-btn:active { transform: translateY(-50%) scale(0.95); }
+      .room-code .copy-btn.copied { background: #166534; border-color: #16a34a; color: #bbf7d0; }
+
+      /* Status lines */
+      .status-row { display: flex; flex-direction: column; gap: 6px; }
+      .status-row .conn-status { font-size: 13px; color: #4ade80; }
+      .status-row .watch-count { font-size: 13px; color: #9a9a9a; }
+
+      /* Room controls */
+      .control-toggle-row {
+        display: flex; align-items: center; gap: 10px; cursor: pointer;
+        padding: 4px 0;
+      }
+      .control-toggle-row input[type="checkbox"] {
+        width: 18px; height: 18px; accent-color: #4ade80; flex-shrink: 0;
+      }
+      .control-toggle-row span { font-size: 14px; color: #e5e5e5; user-select: none; }
+      .control-note { font-size: 12px; color: #9a9a9a; margin-top: 4px; min-height: 16px; }
+
+      /* Participants */
+      .participants-list { display: flex; flex-direction: column; gap: 8px; }
+      .participant {
+        display: flex; align-items: center; gap: 10px;
+        padding: 6px 8px; border-radius: 8px;
+        background: #1c1c1c; border: 1px solid #2a2a2a;
+        transition: border-color 0.15s, background 0.15s;
+      }
+      .participant:hover { border-color: #3a3a3a; background: #222; }
+      .participant .dot {
+        width: 10px; height: 10px; border-radius: 50%; background: #4ade80; flex-shrink: 0;
+        box-shadow: 0 0 6px rgba(74, 222, 128, 0.5);
+        animation: pulse 1.5s ease-in-out infinite;
+      }
+      @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+      .participant.offline .dot { background: #6b7280; box-shadow: none; animation: none; }
+      .participant .name {
+        flex: 1; min-width: 0; font-size: 14px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
+      .badge {
+        font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px;
+        white-space: nowrap; margin-left: 6px;
+      }
+      .badge-you { background: #f59e0b; color: #111; }
+      .badge-host { background: #b45309; color: #fff; }
+
+      /* Inputs & Buttons in sidebar */
+      .sidebar input[type="text"] {
+        width: 100%; height: 40px; padding: 0 12px; font-size: 14px;
+        background: #1c1c1c; border: 1px solid #333; border-radius: 6px;
+        color: #fff; transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+      }
+      .sidebar input[type="text"]::placeholder { color: #6b7280; opacity: 1; }
+      .sidebar input[type="text"]:focus {
+        outline: none; border-color: #4ade80;
+        box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.15); background: #111;
+      }
+      .sidebar input[type="text"]:disabled { opacity: 0.5; cursor: not-allowed; }
+
+      .sidebar .input-row { display: flex; flex-direction: column; gap: 12px; }
+      .sidebar .input-row > label { font-size: 12px; color: #9a9a9a; font-weight: 500; }
+
+      .sidebar .btn {
+        width: 100%; height: 40px; padding: 0 16px; font-size: 14px; font-weight: 600;
+        border: none; border-radius: 6px; cursor: pointer;
+        background: #4ade80; color: #111;
+        transition: background 0.15s, transform 0.05s, box-shadow 0.15s, opacity 0.15s;
+      }
+      .sidebar .btn:hover:not(:disabled) { background: #5ee08a; }
+      .sidebar .btn:active:not(:disabled) { transform: scale(0.98); }
+      .sidebar .btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.35); }
+      .sidebar .btn:disabled { opacity: 0.45; cursor: not-allowed; background: #4ade80; }
+
+      /* Playlist & Poll empty states */
+      .sidebar .empty-state { font-size: 13px; color: #9a9a9a; text-align: center; padding: 8px 0; }
+
+      .playlist-item, .poll-option {
+        display: flex; align-items: center; justify-content: space-between; gap: 8px;
+        background: #1c1c1c; border: 1px solid #2a2a2a; border-radius: 8px;
+        padding: 10px 12px; font-size: 13px;
+      }
+      .playlist-item .title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #e5e5e5; }
+      .playlist-item .actions { display: flex; gap: 6px; }
+      .playlist-item .actions button, .poll-option button {
+        padding: 6px 10px; font-size: 12px; font-weight: 500;
+        border: none; border-radius: 6px; cursor: pointer;
+        background: #2a2a2a; color: #e5e5e5; border: 1px solid #3a3a3a;
+        transition: background 0.15s, border-color 0.15s;
+      }
+      .playlist-item .actions button:hover, .poll-option button:hover { background: #3a3a3a; border-color: #4a4a4a; }
+      .playlist-item .actions button:focus-visible, .poll-option button:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.25); }
+
+      .poll-option { flex-direction: column; align-items: stretch; gap: 8px; }
+      .poll-option .option-text { display: flex; justify-content: space-between; align-items: center; }
+      .poll-option .vote-count { font-size: 12px; color: #9a9a9a; }
+
       .main { flex: 1; display: flex; flex-direction: column; padding: 16px; gap: 12px; min-width: 0; }
+
+      /* Responsive: under 800px sidebar becomes top drawer */
+      @media (max-width: 800px) {
+        .app { flex-direction: column; }
+        .sidebar {
+          width: 100%; height: auto; max-height: 50vh; border-right: none; border-bottom: 1px solid #2a2a2a;
+          position: sticky; top: 0; z-index: 10; padding: 16px;
+        }
+        .sidebar .section { margin-top: 16px; }
+        .sidebar .section-title { margin-bottom: 8px; }
+        .sidebar .input-row { gap: 8px; }
+        .sidebar input[type="text"], .sidebar .btn { height: 36px; font-size: 13px; }
+      }
       .video-wrap { position: relative; background: #000; border-radius: 8px; overflow: hidden; }
       video { width: 100%; max-height: 55vh; background: #000; display: block; cursor: pointer; }
       .controls {
@@ -43,10 +180,23 @@
       .controls button, .row button, .join-box button {
         background: #fff; border: none; padding: 8px 14px;
         border-radius: 4px; cursor: pointer; font-size: 14px;
+        transition: background 0.15s, transform 0.05s;
       }
       .controls button:hover, .row button:hover, .join-box button:hover { background: #ddd; }
+      .controls button:active, .row button:active, .join-box button:active { transform: scale(0.98); }
+      .controls button:focus-visible, .row button:focus-visible, .join-box button:focus-visible {
+        outline: none; box-shadow: 0 0 0 3px rgba(29,78,216,0.4);
+      }
       .controls button:disabled { opacity: 0.4; cursor: not-allowed; }
-      .rate { background: #333; color: #fff; padding: 6px 10px; border-radius: 4px; font-size: 13px; }
+      .controls .rate {
+        background: #333; color: #fff; padding: 8px 14px;
+        border-radius: 4px; cursor: pointer; font-size: 14px;
+        border: 1px solid #444; min-width: 60px; text-align: center;
+        transition: background 0.15s, border-color 0.15s, transform 0.05s;
+      }
+      .controls .rate:hover { background: #444; border-color: #555; }
+      .controls .rate:active { transform: scale(0.98); }
+      .controls .rate:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(74,222,128,0.4); border-color: #4ade80; }
       .status { font-size: 12px; color: #aaa; }
       .status.ok { color: #0f0; }
       .status.warn { color: #ff0; }
@@ -91,15 +241,61 @@
       #joinOverlay {
         position: fixed; inset: 0; background: rgba(0,0,0,0.85);
         display: flex; align-items: center; justify-content: center; z-index: 200;
+        padding: 24px; /* ensure space on small screens */
       }
-      .join-box { background: #222; padding: 32px; border-radius: 12px; width: 340px; text-align: center; }
-      .join-box h1 { margin-bottom: 6px; }
-      .join-box p { color: #aaa; font-size: 13px; margin-bottom: 16px; }
-      .join-box input { width: 100%; margin-bottom: 10px; text-transform: none; }
-      .join-box input#codeInput { text-transform: uppercase; text-align: center; letter-spacing: 2px; }
-      .join-box .btn-row { display: flex; gap: 8px; }
-      .join-box .btn-row button { flex: 1; }
-      #joinError { color: #f66; font-size: 13px; min-height: 18px; margin-top: 8px; }
+      .join-box {
+        background: #222; border-radius: 12px; width: 100%; max-width: 360px;
+        padding: 40px 36px; text-align: center;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05);
+      }
+      .join-box h1 {
+        font-size: 28px; font-weight: 700; letter-spacing: -0.5px;
+        margin-bottom: 8px; color: #fff;
+      }
+      .join-box > p {
+        color: #aaa; font-size: 15px; line-height: 1.5;
+        margin-bottom: 28px; font-weight: 400;
+      }
+      .join-box .form-group { margin-bottom: 16px; text-align: left; }
+      .join-box label {
+        display: block; font-size: 13px; color: #ccc; margin-bottom: 6px; font-weight: 400;
+      }
+      .join-box input {
+        width: 100%; padding: 14px 16px; font-size: 15px;
+        border: 1px solid #444; border-radius: 8px;
+        background: #1a1a1a; color: #fff;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+        text-transform: none;
+      }
+      .join-box input::placeholder { color: #666; opacity: 1; }
+      .join-box input:focus {
+        outline: none; border-color: #1d4ed8; box-shadow: 0 0 0 3px rgba(29,78,216,0.25);
+        background: #111;
+      }
+      .join-box input#codeInput {
+        text-transform: uppercase; text-align: center; letter-spacing: 3px; font-weight: 500;
+      }
+      .join-box .btn-row {
+        display: flex; gap: 10px; margin-top: 8px;
+      }
+      .join-box .btn-row button {
+        flex: 1; padding: 14px 20px; font-size: 15px; font-weight: 600;
+        border: none; border-radius: 8px; cursor: pointer;
+        background: #1d4ed8; color: #fff;
+        transition: background 0.15s ease, transform 0.05s ease;
+      }
+      .join-box .btn-row button:hover { background: #2563eb; }
+      .join-box .btn-row button:active { transform: scale(0.98); }
+      .join-box .btn-row button:focus-visible {
+        outline: none; box-shadow: 0 0 0 3px rgba(29,78,216,0.4);
+      }
+      .join-box #createBtn { background: #1d4ed8; }
+      .join-box #joinBtn { background: #374151; }
+      .join-box #joinBtn:hover { background: #4b5563; }
+      #joinError {
+        color: #f87171; font-size: 13px; min-height: 20px; margin-top: 14px;
+        line-height: 1.4; text-align: center;
+      }
     </style>
   </head>
   <body>
@@ -107,8 +303,14 @@
       <div class="join-box">
         <h1>CineSync</h1>
         <p>Watch videos together, in sync.</p>
-        <input id="nameInput" type="text" maxlength="40" placeholder="Your name" autocomplete="off" />
-        <input id="codeInput" type="text" maxlength="8" placeholder="Room code (blank = new room)" autocomplete="off" />
+        <div class="form-group">
+          <label for="nameInput">Your name</label>
+          <input id="nameInput" type="text" maxlength="40" placeholder="Enter your name" autocomplete="off" />
+        </div>
+        <div class="form-group">
+          <label for="codeInput">Room code <span style="color:#666;font-weight:400;">(optional)</span></label>
+          <input id="codeInput" type="text" maxlength="8" placeholder="ABC123" autocomplete="off" />
+        </div>
         <div class="btn-row">
           <button id="createBtn">Create room</button>
           <button id="joinBtn">Join room</button>
@@ -118,43 +320,66 @@
     </div>
 
     <div class="app">
-      <div class="sidebar">
-        <h2>Room</h2>
-        <div class="room-code" id="roomCode" title="Click to copy invite link">------</div>
-        <div id="connStatus" class="status">connecting…</div>
-        <div class="status" id="watchCount"></div>
-        <h3>Room controls</h3>
-        <label class="status" style="display:flex;gap:6px;align-items:center;cursor:pointer">
-          <input type="checkbox" id="controlToggle" checked /> Everyone can control
-        </label>
-        <div class="status" id="controlNote"></div>
-        <h3>Participants</h3>
-        <div id="participants"></div>
-        <h3>Playlist</h3>
-        <div id="playlist"></div>
-        <div class="row" style="margin-top:6px">
-          <input id="videoTitleInput" type="text" placeholder="Video title" />
-        </div>
-        <div class="row" style="margin-top:6px">
-          <input id="videoUrlInput" type="text" placeholder="Direct MP4/WebM URL (not YouTube)" />
-        </div>
-        <div class="row" style="margin-top:6px">
-          <button id="addVideoBtn">Add to playlist</button>
-        </div>
-        <h3>Poll</h3>
-        <div id="poll"></div>
-        <div class="row" style="margin-top:6px">
-          <input id="pollQInput" type="text" placeholder="Poll question" />
-        </div>
-        <div class="row" style="margin-top:6px">
-          <input id="pollOptsInput" type="text" placeholder="Options, comma separated" />
-        </div>
-        <div class="row" style="margin-top:6px">
-          <button id="createPollBtn">Start poll</button>
-        </div>
-      </div>
+      <aside class="sidebar">
+        <!-- Section: Header + Room Code -->
+        <section class="section sidebar-header">
+          <div class="room-title">Room</div>
+          <div class="room-code" id="roomCode" title="Click to copy invite link">
+            <span class="code-value">------</span>
+            <button type="button" class="copy-btn" aria-label="Copy room code" title="Copy">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            </button>
+          </div>
+          <div class="status-row">
+            <div id="connStatus" class="conn-status">connecting…</div>
+            <div id="watchCount" class="watch-count"></div>
+          </div>
+        </section>
 
-      <div class="main">
+        <!-- Section: Room controls -->
+        <section class="section">
+          <div class="section-title">Room controls</div>
+          <label class="control-toggle-row">
+            <input type="checkbox" id="controlToggle" checked />
+            <span>Everyone can control</span>
+          </label>
+          <div id="controlNote" class="control-note"></div>
+        </section>
+
+        <!-- Section: Participants -->
+        <section class="section">
+          <div class="section-title">Participants</div>
+          <div id="participants" class="participants-list"></div>
+        </section>
+
+        <!-- Section: Playlist -->
+        <section class="section">
+          <div class="section-title">Playlist</div>
+          <div id="playlist"></div>
+          <div class="input-row">
+            <label for="videoTitleInput">Video title</label>
+            <input type="text" id="videoTitleInput" placeholder="Video title" maxlength="100" />
+            <label for="videoUrlInput">Direct MP4/WebM URL</label>
+            <input type="text" id="videoUrlInput" placeholder="MP4/WebM URL (not YouTube)" />
+            <button type="button" id="addVideoBtn" class="btn" disabled>Add to playlist</button>
+          </div>
+        </section>
+
+        <!-- Section: Poll -->
+        <section class="section">
+          <div class="section-title">Poll</div>
+          <div id="poll"></div>
+          <div class="input-row">
+            <label for="pollQInput">Poll question</label>
+            <input type="text" id="pollQInput" placeholder="Poll question" maxlength="200" />
+            <label for="pollOptsInput">Options (comma separated)</label>
+            <input type="text" id="pollOptsInput" placeholder="Options, comma separated" />
+            <button type="button" id="createPollBtn" class="btn" disabled>Start poll</button>
+          </div>
+        </section>
+      </aside>
+
+      <main class="main">
         <div class="video-wrap" id="videoWrap">
           <video id="video" playsinline preload="metadata"></video>
           <div id="noVideoHint">No shared video loaded.<br />Pick a sample below or paste a video URL and press “Set video”.</div>
@@ -164,7 +389,7 @@
           <button id="playPause">Play</button>
           <button id="seekBack">-10s</button>
           <button id="seekFwd">+10s</button>
-          <span class="rate" id="rateLabel">1.0x</span>
+          <button type="button" class="rate" id="rateBtn" title="Click to change playback speed">1.0x</button>
           <span class="status" id="driftLabel">drift: —</span>
           <span class="status" id="clockLabel">sync: —</span>
           <span class="status warn" id="modeLabel"></span>
@@ -199,13 +424,14 @@
       // ---------- DOM ----------
       const $ = (id) => document.getElementById(id);
       const video = $('video'), videoWrap = $('videoWrap');
-      const playPauseBtn = $('playPause'), seekBackBtn = $('seekBack'), seekFwdBtn = $('seekFwd');
-      const rateLabel = $('rateLabel'), driftLabel = $('driftLabel'), clockLabel = $('clockLabel');
-      const roomCodeEl = $('roomCode'), participantsEl = $('participants'), connStatus = $('connStatus');
+      const playPauseBtn = $('playPause'), seekBackBtn = $('seekBack'), seekFwdBtn = $('seekFwd'), rateBtn = $('rateBtn');
+      const driftLabel = $('driftLabel'), clockLabel = $('clockLabel');
+      const roomCodeEl = $('roomCode'), roomCodeValue = roomCodeEl?.querySelector('.code-value'), roomCodeCopyBtn = roomCodeEl?.querySelector('.copy-btn');
+      const participantsEl = $('participants'), connStatus = $('connStatus');
       const chatEl = $('chat'), chatInput = $('chatInput'), chatSend = $('chatSend');
       const emojiRow = $('emojiRow');
-      const playlistEl = $('playlist'), videoTitleInput = $('videoTitleInput'), videoUrlInput = $('videoUrlInput');
-      const pollEl = $('poll'), pollQInput = $('pollQInput'), pollOptsInput = $('pollOptsInput');
+      const playlistEl = $('playlist'), videoTitleInput = $('videoTitleInput'), videoUrlInput = $('videoUrlInput'), addVideoBtn = $('addVideoBtn');
+      const pollEl = $('poll'), pollQInput = $('pollQInput'), pollOptsInput = $('pollOptsInput'), createPollBtn = $('createPollBtn');
       const setVideoInput = $('setVideoInput');
       const overlay = $('joinOverlay'), nameInput = $('nameInput'), codeInput = $('codeInput'), joinError = $('joinError');
       const noVideoHint = $('noVideoHint'), errBar = $('errBar'), modeLabel = $('modeLabel');
@@ -297,7 +523,7 @@
 
         function applyRoomMeta(data) {
           if (!data) return;
-          if (data.roomCode) { myRoomCode = data.roomCode; roomCodeEl.textContent = myRoomCode; }
+          if (data.roomCode) { myRoomCode = data.roomCode; if (roomCodeValue) roomCodeValue.textContent = myRoomCode; }
           if ('hostId' in data) myHostId = data.hostId;
           if ('everyoneCanControl' in data) {
             myEveryoneCanControl = data.everyoneCanControl !== false;
@@ -418,7 +644,7 @@
         storedState = ps;
         playbackRate = ps.rate || 1;
         video.playbackRate = playbackRate;
-        rateLabel.textContent = Number(playbackRate).toFixed(1) + 'x';
+        if (rateBtn) rateBtn.textContent = Number(playbackRate).toFixed(2).replace(/\.?0+$/, '') + 'x';
         loadVideoSource(ps.videoId);
         updateNoVideoHint();
         const expected = ps.status === 'paused'
@@ -445,7 +671,7 @@
         joined = true;
         overlay.style.display = 'none';
         myRoomCode = data.roomCode || myRoomCode;
-        roomCodeEl.textContent = myRoomCode || '------';
+        if (roomCodeValue) roomCodeValue.textContent = myRoomCode || '------';
         if ('hostId' in data) myHostId = data.hostId;
         if ('everyoneCanControl' in data) {
           myEveryoneCanControl = data.everyoneCanControl !== false;
@@ -527,20 +753,20 @@
           ? lastParticipants.length + (lastParticipants.length === 1 ? ' person watching' : ' people watching')
           : '';
         participantsEl.innerHTML = lastParticipants.map((p) =>
-          '<div class="participant">' +
-          '<span class="dot"></span><span>' + escapeHtml(p.name) + '</span>' +
-          (p.id === me ? '<span class="host-badge">YOU</span>' : '') +
-          (p.id === myHostId ? '<span class="host-badge">HOST</span>' : '') +
+          '<div class="participant' + (p.connected === false ? ' offline' : '') + '">' +
+          '<span class="dot"></span><span class="name">' + escapeHtml(p.name) + '</span>' +
+          (p.id === me ? '<span class="badge badge-you">YOU</span>' : '') +
+          (p.id === myHostId ? '<span class="badge badge-host">HOST</span>' : '') +
           '</div>'
         ).join('');
         renderControlNote();
       }
 
       function renderPlaylist(list) {
-        if (!list.length) { playlistEl.innerHTML = '<div class="status">Empty — add a video below.</div>'; return; }
+        if (!list.length) { playlistEl.innerHTML = '<div class="empty-state">Empty — add a video below.</div>'; return; }
         playlistEl.innerHTML = list.map((it) =>
-          '<div class="playlist-item"><span>' + escapeHtml(it.title || it.movieId) + '</span>' +
-          '<span><button data-play="' + escapeHtml(it.movieId) + '">Play</button> ' +
+          '<div class="playlist-item"><span class="title">' + escapeHtml(it.title || it.movieId) + '</span>' +
+          '<span class="actions"><button data-play="' + escapeHtml(it.movieId) + '">Play</button> ' +
           '<button data-del="' + it.id + '">✕</button></span></div>'
         ).join('');
       }
@@ -557,17 +783,18 @@
       });
 
       function renderPoll() {
-        if (!activePoll) { pollEl.innerHTML = '<div class="status">No active poll.</div>'; return; }
+        if (!activePoll) { pollEl.innerHTML = '<div class="empty-state">No active poll.</div>'; return; }
         const counts = {};
         Object.values(activePoll.votes || {}).forEach((opt) => { counts[opt] = (counts[opt] || 0) + 1; });
-        pollEl.innerHTML = '<div class="status">' + escapeHtml(activePoll.question) + '</div>' +
+        pollEl.innerHTML = '<div class="poll-question" style="font-size:13px;color:#e5e5e5;margin-bottom:8px;">' + escapeHtml(activePoll.question) + '</div>' +
           activePoll.options.map((o) =>
-            '<div class="poll-option"><span>' + escapeHtml(o.text) + ' (' + (counts[o.id] || 0) + ')</span>' +
+            '<div class="poll-option"><div class="option-text"><span>' + escapeHtml(o.text) + '</span>' +
+            '<span class="vote-count">' + (counts[o.id] || 0) + ' vote' + ((counts[o.id] || 0) !== 1 ? 's' : '') + '</span></div>' +
             (activePoll.status === 'open'
-              ? '<button data-vote="' + o.id + '">Vote</button>'
+              ? '<button data-vote="' + o.id + '" style="margin-top:4px;">Vote</button>'
               : '') + '</div>'
           ).join('') +
-          (activePoll.status === 'open' ? '<div class="row" style="margin-top:6px"><button id="closePollBtn">Close poll</button></div>' : '<div class="status">Closed</div>');
+          (activePoll.status === 'open' ? '<button id="closePollBtn" class="btn" style="margin-top:8px;">Close poll</button>' : '<div class="empty-state" style="margin-top:8px;">Closed</div>');
       }
       renderPoll();
 
@@ -581,6 +808,54 @@
           socket.emit('close-poll', { pollId: activePoll.id, clientSeq, baseVersion, userId: socket.id });
         }
       });
+
+      // Room code copy button
+      if (roomCodeCopyBtn) {
+        roomCodeCopyBtn.addEventListener('click', () => {
+          const code = roomCodeValue?.textContent?.trim();
+          if (!code || code === '------') return;
+          const base = location.protocol.startsWith('http') ? location.origin : 'http://localhost:3000';
+          const url = base + '/?code=' + code;
+          navigator.clipboard?.writeText(url).then(() => {
+            roomCodeCopyBtn.classList.add('copied');
+            roomCodeCopyBtn.setAttribute('aria-label', 'Copied!');
+            setTimeout(() => {
+              roomCodeCopyBtn.classList.remove('copied');
+              roomCodeCopyBtn.setAttribute('aria-label', 'Copy room code');
+            }, 2000);
+          }).catch(() => {
+            prompt('Copy invite link:', url);
+          });
+        });
+      }
+
+      // Input validation for sidebar buttons
+      function validateAddVideoBtn() {
+        if (addVideoBtn) {
+          const hasTitle = videoTitleInput?.value.trim().length > 0;
+          const hasUrl = videoUrlInput?.value.trim().length > 0;
+          addVideoBtn.disabled = !(hasTitle || hasUrl);
+        }
+      }
+      function validateCreatePollBtn() {
+        if (createPollBtn) {
+          const hasQuestion = pollQInput?.value.trim().length > 0;
+          const hasOptions = pollOptsInput?.value.trim().split(',').map(s => s.trim()).filter(Boolean).length >= 2;
+          createPollBtn.disabled = !(hasQuestion && hasOptions);
+        }
+      }
+      [videoTitleInput, videoUrlInput].forEach(el => el?.addEventListener('input', validateAddVideoBtn));
+      [pollQInput, pollOptsInput].forEach(el => el?.addEventListener('input', validateCreatePollBtn));
+
+      // Room code click to copy (fallback for the whole box)
+      if (roomCodeEl) {
+        roomCodeEl.style.cursor = 'pointer';
+        roomCodeEl.addEventListener('click', (e) => {
+          if (e.target !== roomCodeCopyBtn && !roomCodeCopyBtn?.contains(e.target)) {
+            roomCodeCopyBtn?.click();
+          }
+        });
+      }
 
       function addChat(who, text, mine) {
         const d = document.createElement('div');
@@ -639,6 +914,29 @@
         clientSeq++;
         socket.emit('seek', { positionMs: Math.round(video.currentTime * 1000), clientSeq, baseVersion });
       });
+
+      // Playback speed cycling
+      const SPEEDS = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
+      function formatSpeed(speed) {
+        return Number(speed).toFixed(2).replace(/\.?0+$/, '') + 'x';
+      }
+      function cyclePlaybackRate() {
+        if (!joined || !socket) return;
+        const current = playbackRate || 1.0;
+        const idx = SPEEDS.findIndex(s => Math.abs(s - current) < 0.01);
+        const nextIdx = (idx + 1) % SPEEDS.length;
+        const nextRate = SPEEDS[nextIdx];
+
+        // Optimistic UI update
+        playbackRate = nextRate;
+        video.playbackRate = nextRate;
+        if (rateBtn) rateBtn.textContent = formatSpeed(nextRate);
+
+        // Send to server
+        clientSeq++;
+        socket.emit('set-rate', { rate: nextRate, clientSeq, baseVersion });
+      }
+      if (rateBtn) rateBtn.addEventListener('click', cyclePlaybackRate);
 
       function sendChat() {
         const v = chatInput.value.trim();
@@ -727,21 +1025,6 @@
         if (!joined || !socket) return;
         // Only the host's toggle is enabled; server enforces this too.
         socket.emit('toggle-control', { open: controlToggle.checked, userId: socket.id });
-      });
-
-      roomCodeEl.addEventListener('click', () => {
-        if (!myRoomCode) return;
-        const base = location.protocol.startsWith('http') ? location.origin : 'http://localhost:3000';
-        const link = base + '/?code=' + myRoomCode;
-        const done = () => {
-          roomCodeEl.style.background = '#1d4ed8';
-          setTimeout(() => { roomCodeEl.style.background = ''; }, 800);
-        };
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(link).then(done, () => { window.prompt('Copy invite link:', link); });
-        } else {
-          window.prompt('Copy invite link:', link);
-        }
       });
 
       // ---------- Join ----------
