@@ -19,6 +19,7 @@ type Participant = {
   connected: boolean
   joinedAt: number
   leftAt?: number
+  reactionHistory?: number[]
 }
 
 type Room = {
@@ -270,6 +271,40 @@ io.on('connection', (socket) => {
     io.to(roomCode).emit('state-update', {
       playbackState: room.playbackState,
       version: room.version,
+    })
+  })
+
+  socket.on('reaction', ({ emoji, baseVersion, clientSeq, userId }: { emoji: string; baseVersion: number; clientSeq: number; userId: string }) => {
+    const roomCode = (socket as any).roomCode
+    if (!roomCode) return
+
+    const room = rooms.get(roomCode)
+    if (!room) return
+
+    // Validate baseVersion
+    if (room.version !== baseVersion) {
+      socket.emit('error', { message: 'Stale version' })
+      return
+    }
+
+    // Rate limit: max 3 reactions per 15 seconds per user
+    const participant = room.participants.find((p) => p.id === userId)
+    if (participant) {
+      const now = Date.now()
+      const recentReactions = (participant.reactionHistory || []).filter(
+        (ts: number) => now - ts < 15000
+      )
+      if (recentReactions.length >= 3) {
+        socket.emit('error', { message: 'Rate limited: max 3 reactions per 15 seconds' })
+        return
+      }
+      ;(participant.reactionHistory ||= []).push(now)
+    }
+
+    io.to(roomCode).emit('reaction', {
+      emoji,
+      userId,
+      serverTimestampMs: Date.now(),
     })
   })
 
