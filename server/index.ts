@@ -391,48 +391,6 @@ io.on('connection', (socket) => {
     })
   })
 
-  socket.on('set-rate', ({ rate, baseVersion, clientSeq }: { rate: number; baseVersion: number; clientSeq: number }) => {
-    const roomCode = (socket as any).roomCode
-    if (!roomCode) return
-
-    const room = rooms.get(roomCode)
-    if (!room) return
-
-    if (room.version !== baseVersion) {
-      socket.emit('error', {
-        message: 'Stale version, resynced to latest state',
-        version: room.version,
-        playbackState: room.playbackState,
-      })
-      return
-    }
-
-    if (!canControl(room, socket.id)) {
-      socket.emit('error', { message: 'Only the host can change speed right now' })
-      return
-    }
-
-    const newRate = Number(rate)
-    if (!isFinite(newRate) || newRate < 0.25 || newRate > 2.5) {
-      socket.emit('error', { message: 'Speed must be between 0.25x and 2.5x' })
-      return
-    }
-
-    // Fold elapsed playback into positionMs so changing the slope doesn't jump.
-    const now = Date.now()
-    const ps = room.playbackState
-    if (ps.status === 'playing') {
-      ps.positionMs = Math.max(0, ps.positionMs + (now - ps.serverTimestampMs) * ps.rate)
-    }
-    ps.rate = newRate
-    ps.serverTimestampMs = now
-    room.version++
-    io.to(roomCode).emit('state-update', {
-      playbackState: room.playbackState,
-      version: room.version,
-    })
-  })
-
   socket.on('reaction', ({ emoji, baseVersion, clientSeq, userId }: { emoji: string; baseVersion: number; clientSeq: number; userId: string }) => {
     const roomCode = (socket as any).roomCode
     if (!roomCode) return
@@ -698,56 +656,6 @@ socket.on('reorder-playlist', ({ itemIds, clientSeq, baseVersion, userId }: { it
       everyoneCanControl: room.everyoneCanControl,
       hostId: room.hostId,
     })
-  })
-
-  // Host-only: hand hosting to another participant
-  socket.on('transfer-host', ({ userId }: { userId: string }) => {
-    const roomCode = (socket as any).roomCode
-    if (!roomCode) return
-
-    const room = rooms.get(roomCode)
-    if (!room) return
-
-    if (room.hostId !== socket.id) {
-      socket.emit('error', { message: 'Only the host can transfer hosting' })
-      return
-    }
-    if (!room.participants.some((p) => p.id === userId)) {
-      socket.emit('error', { message: 'That user is not in the room' })
-      return
-    }
-
-    room.hostId = userId
-    io.to(roomCode).emit('room-settings', {
-      everyoneCanControl: room.everyoneCanControl,
-      hostId: room.hostId,
-    })
-    io.to(roomCode).emit('participants-update', roomInfo(room))
-    console.log(`Host transferred to ${userId} in room ${roomCode}`)
-  })
-
-  // Host-only: remove a participant (they are disconnected)
-  socket.on('remove-participant', ({ userId }: { userId: string }) => {
-    const roomCode = (socket as any).roomCode
-    if (!roomCode) return
-
-    const room = rooms.get(roomCode)
-    if (!room) return
-
-    if (room.hostId !== socket.id) {
-      socket.emit('error', { message: 'Only the host can remove people' })
-      return
-    }
-    if (userId === socket.id) {
-      socket.emit('error', { message: 'You cannot remove yourself' })
-      return
-    }
-
-    room.participants = room.participants.filter((p) => p.id !== userId)
-    io.to(roomCode).emit('participants-update', roomInfo(room))
-    const target = io.sockets.sockets.get(userId)
-    if (target) target.disconnect(true)
-    console.log(`Participant ${userId} removed from room ${roomCode}`)
   })
 
   socket.on('disconnect', () => {

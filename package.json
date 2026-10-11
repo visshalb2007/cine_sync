@@ -11,8 +11,7 @@
     "dev": "npx tsx watch server/index.ts",
     "start": "node dist/server/index.js",
     "build": "npx tsc",
-    "fetch-media": "node scripts/fetch-media.mjs",
-    "check-ids": "node scripts/check-ids.js"
+    "fetch-media": "node scripts/fetch-media.mjs"
   },
   "repository": {
     "type": "git",

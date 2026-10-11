@@ -4,813 +4,193 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CineSync - Watch Party</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
     <style>
-      /* ============ Design tokens ============ */
-      :root {
-        --bg: #0B0B10;
-        --surface: #14141C;
-        --surface-2: #1C1C27;
-        --surface-3: #242433;
-        --border: rgba(255, 255, 255, .08);
-        --text: #F2F2F7;
-        --muted: #9A9AB0;
-        --muted-dim: #6B6B84;
-        --accent-1: #7C5CFF;
-        --accent-2: #FF5C8A;
-        --accent-grad: linear-gradient(135deg, #7C5CFF, #FF5C8A);
-        --success: #3DDC97;
-        --warning: #FFB84D;
-        --danger: #FF5C6C;
-        --info: #5CB8FF;
-        --radius: 12px;
-        --radius-pill: 999px;
-        --shadow: 0 8px 28px rgba(0, 0, 0, .45);
-        --font: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
-        --t: 200ms;
-      }
       * { box-sizing: border-box; margin: 0; padding: 0; }
-      html, body { height: 100%; }
       body {
-        font-family: var(--font);
-        background: radial-gradient(1200px 600px at 20% -10%, rgba(124, 92, 255, .12), transparent 60%),
-                    radial-gradient(1000px 500px at 90% 0%, rgba(255, 92, 138, .08), transparent 60%),
-                    var(--bg);
-        color: var(--text);
-        font-size: 14px;
-        min-height: 100vh;
+        font-family: system-ui, -apple-system, sans-serif;
+        background: #111; color: #fff; min-height: 100vh;
       }
-      button { font-family: inherit; }
-      :focus-visible { outline: 2px solid var(--accent-1); outline-offset: 2px; border-radius: 6px; }
-
-      /* ============ Buttons ============ */
-      .btn {
-        border: none; cursor: pointer; font-size: 14px; font-weight: 500;
-        padding: 10px 18px; border-radius: var(--radius-pill);
-        transition: transform var(--t), box-shadow var(--t), background var(--t), opacity var(--t);
-        display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      .app { display: flex; min-height: 100vh; }
+      .sidebar { width: 280px; background: #222; padding: 20px; overflow-y: auto; flex-shrink: 0; }
+      .sidebar h2 {
+        margin-bottom: 12px; font-size: 18px;
+        border-bottom: 1px solid #444; padding-bottom: 10px;
       }
-      .btn:active { transform: scale(.97); }
-      .btn:disabled { opacity: .4; cursor: not-allowed; transform: none; }
-      .btn-primary { background: var(--accent-grad); color: #fff; box-shadow: 0 4px 18px rgba(124, 92, 255, .35); }
-      .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(124, 92, 255, .45); }
-      .btn-secondary { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
-      .btn-secondary:hover { background: var(--surface-3); transform: translateY(-1px); }
-      .btn-ghost { background: transparent; color: var(--muted); padding: 8px 12px; }
-      .btn-ghost:hover { color: var(--text); background: rgba(255, 255, 255, .06); }
-      .icon-btn {
-        width: 40px; height: 40px; border-radius: 50%; border: 1px solid transparent;
-        background: rgba(255, 255, 255, .06); color: var(--text); cursor: pointer;
-        display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
-        transition: transform var(--t), background var(--t), border-color var(--t);
-      }
-      .icon-btn:hover { background: rgba(255, 255, 255, .12); transform: scale(1.06); }
-      .icon-btn:active { transform: scale(.97); }
-      .icon-btn svg { width: 20px; height: 20px; }
-      .icon-btn.active { background: var(--accent-grad); border-color: transparent; }
-
-      /* ============ Header ============ */
-      .topbar {
-        display: flex; align-items: center; gap: 16px;
-        padding: 12px 20px; border-bottom: 1px solid var(--border);
-        background: rgba(20, 20, 28, .8); backdrop-filter: blur(12px);
-        position: sticky; top: 0; z-index: 100;
-      }
-      .logo { display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 600; }
-      .logo-badge {
-        width: 36px; height: 36px; border-radius: 10px; background: var(--accent-grad);
-        display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(124, 92, 255, .4);
-      }
-      .logo-badge svg { width: 20px; height: 20px; color: #fff; }
-      .room-pill {
-        display: flex; align-items: center; gap: 8px;
-        background: var(--surface-2); border: 1px solid var(--border);
-        border-radius: var(--radius-pill); padding: 6px 8px 6px 16px;
-      }
+      .sidebar h3 { margin: 16px 0 8px; font-size: 14px; color: #aaa; }
       .room-code {
-        font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 16px;
-        letter-spacing: 3px; color: var(--text); cursor: pointer; user-select: none;
+        background: #333; padding: 8px 12px; margin: 10px 0;
+        font-family: monospace; font-size: 16px; color: #0f0;
+        border-radius: 4px; text-align: center; letter-spacing: 2px;
       }
-      .topbar .spacer { flex: 1; }
-      .conn { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
-      .status { font-size: 12px; color: var(--muted); }
-      .status.ok { color: var(--success); }
-      .status.warn { color: var(--warning); }
-      .status.err { color: var(--danger); }
-      .cdot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted-dim); flex-shrink: 0; }
-      .cdot.ok { background: var(--success); box-shadow: 0 0 8px var(--success); }
-      .cdot.warn { background: var(--warning); box-shadow: 0 0 8px var(--warning); animation: pulse 1s infinite; }
-      .cdot.err { background: var(--danger); }
-      @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .4; } }
-      .avatars { display: flex; align-items: center; }
-      .avatars .av { margin-left: -8px; border: 2px solid var(--bg); }
-      .avatars .av:first-child { margin-left: 0; }
-      .av {
-        width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
-        display: inline-flex; align-items: center; justify-content: center;
-        font-size: 12px; font-weight: 600; color: #fff;
-        background: linear-gradient(135deg, #3a3a52, #23232f);
-        border: 1px solid var(--border);
+      .participant { display: flex; align-items: center; margin: 8px 0; font-size: 14px; }
+      .dot {
+        width: 8px; height: 8px; background: #0f0; border-radius: 50%;
+        margin-right: 8px; animation: pulse 1s infinite; flex-shrink: 0;
       }
-      .sync-badge {
-        display: inline-flex; align-items: center; gap: 6px;
-        font-size: 12px; font-weight: 500; padding: 6px 14px;
-        border-radius: var(--radius-pill); border: 1px solid var(--border);
-        background: var(--surface-2); color: var(--muted); cursor: pointer;
+      @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+      .participant.offline .dot { background: #666; animation: none; }
+      .host-badge {
+        background: #b8860b; color: #111; font-size: 10px; font-weight: bold;
+        padding: 1px 6px; border-radius: 8px; margin-left: 6px;
       }
-      .sync-badge.ok { color: var(--success); border-color: rgba(61, 220, 151, .35); }
-      .sync-badge.warn { color: var(--warning); border-color: rgba(255, 184, 77, .35); }
-      .sync-badge .cdot { width: 7px; height: 7px; }
-
-      /* ============ Layout ============ */
-      .layout {
-        display: grid; grid-template-columns: 68px minmax(0, 1fr) 340px;
-        gap: 16px; padding: 16px 20px 24px; max-width: 1560px; margin: 0 auto;
-        align-items: start;
+      .main { flex: 1; display: flex; flex-direction: column; padding: 16px; gap: 12px; min-width: 0; }
+      .video-wrap { position: relative; background: #000; border-radius: 8px; overflow: hidden; }
+      video { width: 100%; max-height: 55vh; background: #000; display: block; cursor: pointer; }
+      .controls {
+        display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+        background: rgba(0,0,0,0.6); padding: 10px 12px; border-radius: 8px;
       }
-      .rail {
-        display: flex; flex-direction: column; gap: 8px; align-items: center;
-        background: var(--surface); border: 1px solid var(--border);
-        border-radius: var(--radius); padding: 12px 0; position: sticky; top: 76px;
+      .controls button, .row button, .join-box button {
+        background: #fff; border: none; padding: 8px 14px;
+        border-radius: 4px; cursor: pointer; font-size: 14px;
       }
-      .rail-btn {
-        width: 44px; height: 44px; border-radius: 12px; border: none;
-        background: transparent; color: var(--muted); cursor: pointer;
-        display: flex; align-items: center; justify-content: center;
-        transition: background var(--t), color var(--t), transform var(--t);
-        position: relative;
+      .controls button:hover, .row button:hover, .join-box button:hover { background: #ddd; }
+      .controls button:disabled { opacity: 0.4; cursor: not-allowed; }
+      .rate { background: #333; color: #fff; padding: 6px 10px; border-radius: 4px; font-size: 13px; }
+      .status { font-size: 12px; color: #aaa; }
+      .status.ok { color: #0f0; }
+      .status.warn { color: #ff0; }
+      .status.err { color: #f66; }
+      .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+      .row input, .join-box input {
+        padding: 8px; border-radius: 4px; border: 1px solid #444;
+        background: #111; color: #fff; font-size: 14px;
       }
-      .rail-btn:hover { background: rgba(255, 255, 255, .06); color: var(--text); }
-      .rail-btn.active { background: var(--accent-grad); color: #fff; }
-      .rail-btn svg { width: 22px; height: 22px; }
-      .rail-btn .ping {
-        position: absolute; top: 8px; right: 8px; min-width: 16px; height: 16px;
-        border-radius: 999px; background: var(--danger); color: #fff;
-        font-size: 10px; font-weight: 600; display: none;
-        align-items: center; justify-content: center; padding: 0 4px;
+      .row input { flex: 1; min-width: 180px; }
+      .chat { background: #222; border-radius: 8px; padding: 10px; height: 180px; overflow-y: auto; font-size: 13px; }
+      .chat-message { margin-bottom: 8px; padding: 6px 10px; background: #333; border-radius: 4px; max-width: 85%; word-break: break-word; }
+      .chat-message.right { margin-left: auto; background: #1d4ed8; }
+      .chat-message .who { font-size: 11px; color: #aaa; display: block; }
+      .playlist-item, .poll-option {
+        display: flex; justify-content: space-between; align-items: center;
+        background: #333; border-radius: 4px; padding: 6px 10px; margin-bottom: 6px; font-size: 13px;
       }
-      .rail-btn .ping.show { display: inline-flex; }
-
-      .stage { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-      .panel {
-        background: var(--surface); border: 1px solid var(--border);
-        border-radius: var(--radius); overflow: hidden;
-        position: sticky; top: 76px; max-height: calc(100vh - 100px);
-        display: flex; flex-direction: column;
+      .playlist-item button, .poll-option button {
+        background: #444; color: #fff; border: none; border-radius: 4px;
+        padding: 4px 8px; cursor: pointer; font-size: 12px;
       }
-
-      /* ============ Video + overlay ============ */
-      .video-wrap {
-        position: relative; background: #000; border-radius: var(--radius);
-        overflow: hidden; aspect-ratio: 16 / 9; box-shadow: var(--shadow);
-        border: 1px solid var(--border);
+      .playlist-item button:hover, .poll-option button:hover { background: #555; }
+      .reaction-float {
+        position: absolute; font-size: 28px; pointer-events: none;
+        animation: floatUp 3s ease-out forwards; z-index: 50;
       }
-      .video-wrap video { width: 100%; height: 100%; display: block; cursor: pointer; background: #000; }
-      .video-wrap.loading::after {
-        content: ''; position: absolute; inset: 0; pointer-events: none;
-        background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,.07) 50%, transparent 70%);
-        background-size: 200% 100%; animation: shimmer 1.4s infinite;
-      }
-      @keyframes shimmer { from { background-position: 180% 0; } to { background-position: -80% 0; } }
-      #noVideoHint, #videoError {
+      #noVideoHint {
         position: absolute; inset: 0; display: none;
         align-items: center; justify-content: center; text-align: center;
-        color: var(--muted); font-size: 14px; padding: 24px; line-height: 1.7;
+        color: #aaa; font-size: 14px; padding: 20px; pointer-events: none;
       }
-      #videoError { flex-direction: column; gap: 12px; background: rgba(0, 0, 0, .72); color: var(--text); }
-      .player-overlay {
-        position: absolute; left: 0; right: 0; bottom: 0; z-index: 20;
-        padding: 32px 16px 12px;
-        background: linear-gradient(transparent, rgba(0, 0, 0, .82));
-        opacity: 1; transition: opacity 250ms;
-      }
-      .video-wrap.idle .player-overlay { opacity: 0; pointer-events: none; }
-      .video-wrap.idle { cursor: none; }
-      .seek-row { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
-      .seek {
-        position: relative; flex: 1; height: 20px; display: flex; align-items: center; cursor: pointer;
-      }
-      .bufbar {
-        position: absolute; left: 0; height: 4px; border-radius: 999px;
-        background: rgba(255, 255, 255, .22); width: 0%; pointer-events: none;
-      }
-      .seek input[type="range"] {
-        -webkit-appearance: none; appearance: none; width: 100%; height: 20px;
-        background: transparent; cursor: pointer; margin: 0; position: relative; z-index: 1;
-      }
-      .seek input[type="range"]::-webkit-slider-runnable-track { height: 4px; border-radius: 999px; background: var(--seek-fill, rgba(255,255,255,.15)); }
-      .seek input[type="range"]::-webkit-slider-thumb {
-        -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
-        background: #fff; margin-top: -5px; box-shadow: 0 1px 6px rgba(0,0,0,.6);
-        opacity: 0; transition: opacity var(--t);
-      }
-      .seek:hover input[type="range"]::-webkit-slider-thumb,
-      .seek input[type="range"]:focus-visible::-webkit-slider-thumb { opacity: 1; }
-      .seek input[type="range"]::-moz-range-track { height: 4px; border-radius: 999px; background: rgba(255,255,255,.15); }
-      .seek input[type="range"]::-moz-range-progress { height: 4px; border-radius: 999px; background: var(--accent-1); }
-      .seek input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border: none; border-radius: 50%; background: #fff; }
-      .time-label { font-size: 12px; color: rgba(255,255,255,.85); font-variant-numeric: tabular-nums; white-space: nowrap; }
-      .controls {
-        display: flex; gap: 4px; align-items: center;
-      }
-      .controls .grow { flex: 1; }
-      .vol-wrap { display: flex; align-items: center; gap: 4px; }
-      .vol-wrap input[type="range"] { width: 0; opacity: 0; transition: width var(--t), opacity var(--t); accent-color: var(--accent-1); }
-      .vol-wrap:hover input[type="range"], .vol-wrap input[type="range"]:focus-visible { width: 72px; opacity: 1; }
-      .speed-label { font-size: 12px; font-weight: 600; }
-      .reaction-float {
-        position: absolute; font-size: 30px; pointer-events: none; z-index: 30;
-        animation: floatUp 3s ease-out forwards;
+      #errBar {
+        display: none; background: #7f1d1d; color: #fecaca;
+        padding: 8px 12px; border-radius: 8px; font-size: 13px;
       }
       @keyframes floatUp {
-        0% { opacity: 1; transform: translateY(0) scale(.8); }
-        20% { transform: translateY(-30px) scale(1.1); }
-        100% { opacity: 0; transform: translateY(-140px) scale(1); }
+        0% { opacity: 1; transform: translateY(0); }
+        100% { opacity: 0; transform: translateY(-120px); }
       }
-
-      /* ============ Popovers / menus ============ */
-      .pop {
-        position: absolute; z-index: 120; min-width: 220px;
-        background: rgba(28, 28, 39, .96); backdrop-filter: blur(12px);
-        border: 1px solid var(--border); border-radius: var(--radius);
-        box-shadow: var(--shadow); padding: 12px; display: none;
-      }
-      .pop.show { display: block; }
-      .pop h4 { font-size: 12px; color: var(--muted); font-weight: 500; margin-bottom: 8px; text-transform: uppercase; letter-spacing: .6px; }
-      .pop .kv { display: flex; justify-content: space-between; font-size: 13px; padding: 5px 0; border-top: 1px solid var(--border); }
-      .pop .kv:first-of-type { border-top: none; }
-      .pop .kv span:last-child { font-variant-numeric: tabular-nums; }
-      .speed-opt {
-        display: block; width: 100%; text-align: left; background: transparent; border: none;
-        color: var(--text); font-size: 14px; padding: 8px 10px; border-radius: 8px; cursor: pointer;
-      }
-      .speed-opt:hover { background: rgba(255, 255, 255, .07); }
-      .speed-opt.current { color: var(--accent-1); font-weight: 600; }
-
-      /* ============ Reaction bar ============ */
-      .react-bar {
-        display: flex; align-items: center; gap: 8px;
-        background: var(--surface); border: 1px solid var(--border);
-        border-radius: var(--radius-pill); padding: 8px 16px; width: fit-content;
-      }
-      .react-bar .lbl { font-size: 12px; color: var(--muted); margin-right: 4px; }
-      .emoji-btn {
-        width: 40px; height: 40px; border-radius: 50%; border: none;
-        background: transparent; font-size: 22px; cursor: pointer; line-height: 1;
-        transition: transform 150ms, background var(--t);
-      }
-      .emoji-btn:hover { transform: scale(1.25); background: rgba(255, 255, 255, .08); }
-      .emoji-btn:active { transform: scale(1); }
-
-      #errBar {
-        display: none; background: rgba(127, 29, 29, .5); border: 1px solid rgba(255, 92, 108, .4);
-        color: #fecaca; padding: 10px 14px; border-radius: var(--radius); font-size: 13px;
-      }
-
-      /* ============ Tabs / panel ============ */
-      .tabbar { display: flex; gap: 4px; padding: 12px 12px 0; border-bottom: 1px solid var(--border); }
-      .tab-btn {
-        flex: 1; background: transparent; border: none; color: var(--muted);
-        font-size: 13px; font-weight: 500; padding: 10px 4px; cursor: pointer;
-        border-bottom: 2px solid transparent; margin-bottom: -1px;
-        display: flex; align-items: center; justify-content: center; gap: 6px;
-        transition: color var(--t);
-      }
-      .tab-btn svg { width: 16px; height: 16px; }
-      .tab-btn:hover { color: var(--text); }
-      .tab-btn.active { color: var(--text); border-bottom-color: var(--accent-1); }
-      .tab-btn .count {
-        background: var(--danger); color: #fff; font-size: 10px; font-weight: 600;
-        border-radius: 999px; min-width: 16px; height: 16px; display: none;
-        align-items: center; justify-content: center; padding: 0 4px;
-      }
-      .tab-btn .count.show { display: inline-flex; }
-      .tab { display: none; flex-direction: column; min-height: 0; flex: 1; }
-      .tab.active { display: flex; }
-      .tab-scroll { overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
-
-      /* ============ Chat ============ */
-      #tab-chat { min-height: 0; }
-      .chat { overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; flex: 1; min-height: 200px; }
-      .msg { display: flex; gap: 8px; max-width: 88%; }
-      .msg .bubble { background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px 12px 12px 12px; padding: 8px 12px; }
-      .msg .meta { font-size: 11px; color: var(--muted); margin-bottom: 3px; display: flex; gap: 6px; }
-      .msg .text { font-size: 14px; word-break: break-word; line-height: 1.45; }
-      .msg.mine { align-self: flex-end; flex-direction: row-reverse; }
-      .msg.mine .bubble { background: linear-gradient(135deg, rgba(124,92,255,.35), rgba(255,92,138,.3)); border-color: rgba(124,92,255,.4); border-radius: 12px 4px 12px 12px; }
-      .msg.sys { align-self: center; }
-      .msg.sys .bubble { background: transparent; border: none; color: var(--muted); font-size: 12px; text-align: center; padding: 2px 8px; }
-      .chat-empty { text-align: center; color: var(--muted-dim); font-size: 13px; padding: 32px 12px; line-height: 1.7; }
-      .chat-input-row { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--border); position: relative; }
-      .chat-input-row input {
-        flex: 1; background: var(--surface-2); border: 1px solid var(--border);
-        border-radius: var(--radius-pill); padding: 10px 16px; color: var(--text); font-size: 14px; font-family: inherit;
-      }
-      .chat-input-row input:focus { outline: none; border-color: var(--accent-1); }
-      .send-btn { background: var(--accent-grad); border: none; }
-      .jump-btn {
-        position: absolute; bottom: 76px; left: 50%; transform: translateX(-50%);
-        background: var(--surface-3); border: 1px solid var(--border); color: var(--text);
-        font-size: 12px; padding: 6px 14px; border-radius: var(--radius-pill);
-        cursor: pointer; display: none; box-shadow: var(--shadow); z-index: 5;
-      }
-      .jump-btn.show { display: block; }
-      .emoji-pop {
-        position: absolute; bottom: 64px; right: 12px; z-index: 30;
-        background: var(--surface-3); border: 1px solid var(--border); border-radius: var(--radius);
-        padding: 8px; display: none; grid-template-columns: repeat(6, 1fr); gap: 2px; box-shadow: var(--shadow);
-      }
-      .emoji-pop.show { display: grid; }
-      .emoji-pop button { background: transparent; border: none; font-size: 22px; padding: 6px; border-radius: 8px; cursor: pointer; }
-      .emoji-pop button:hover { background: rgba(255, 255, 255, .08); transform: scale(1.15); }
-
-      /* ============ People ============ */
-      .host-card {
-        background: var(--surface-2); border: 1px solid var(--border);
-        border-radius: var(--radius); padding: 12px; margin: 12px 12px 0;
-      }
-      .host-card .t { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 8px; }
-      .switch-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 14px; }
-      .switch { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
-      .switch input { opacity: 0; width: 0; height: 0; }
-      .switch .track {
-        position: absolute; inset: 0; border-radius: 999px; cursor: pointer;
-        background: var(--surface-3); border: 1px solid var(--border); transition: background var(--t);
-      }
-      .switch .track::after {
-        content: ''; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px;
-        border-radius: 50%; background: #fff; transition: transform var(--t);
-      }
-      .switch input:checked + .track { background: var(--accent-grad); border-color: transparent; }
-      .switch input:checked + .track::after { transform: translateX(20px); }
-      .switch input:disabled + .track { opacity: .45; cursor: not-allowed; }
-      .switch input:focus-visible + .track { outline: 2px solid var(--accent-1); outline-offset: 2px; }
-      .person {
-        display: flex; align-items: center; gap: 10px; padding: 8px;
-        border-radius: 10px; position: relative;
-      }
-      .person:hover { background: rgba(255, 255, 255, .04); }
-      .person .nm { flex: 1; font-size: 14px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .person .av { position: relative; }
-      .person .on {
-        position: absolute; bottom: -1px; right: -1px; width: 10px; height: 10px;
-        border-radius: 50%; background: var(--success); border: 2px solid var(--surface);
-      }
-      .pill {
-        font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 999px;
-        background: rgba(255, 255, 255, .08); color: var(--muted); letter-spacing: .4px;
-      }
-      .pill.you { background: rgba(124, 92, 255, .25); color: #c9b8ff; }
-      .pill.host { background: rgba(184, 134, 11, .3); color: #ffd97a; }
-      .kebab-wrap { position: relative; }
-      .kebab-menu {
-        position: absolute; right: 0; top: 36px; z-index: 40; min-width: 150px;
-        background: var(--surface-3); border: 1px solid var(--border);
-        border-radius: 10px; box-shadow: var(--shadow); padding: 6px; display: none;
-      }
-      .kebab-menu.show { display: block; }
-      .kebab-menu button {
-        display: block; width: 100%; text-align: left; background: transparent; border: none;
-        color: var(--text); font-size: 13px; padding: 8px 10px; border-radius: 7px; cursor: pointer;
-      }
-      .kebab-menu button:hover { background: rgba(255, 255, 255, .07); }
-      .kebab-menu button.danger { color: var(--danger); }
-
-      /* ============ Playlist ============ */
-      .pl-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 12px 0; }
-      .pl-head h3 { font-size: 14px; font-weight: 600; }
-      .pl-form { display: none; flex-direction: column; gap: 8px; padding: 0 12px; }
-      .pl-form.open { display: flex; }
-      .pl-form input, .modal input[type="text"] {
-        background: var(--surface-2); border: 1px solid var(--border);
-        border-radius: 10px; padding: 10px 12px; color: var(--text);
-        font-size: 14px; font-family: inherit; width: 100%;
-      }
-      .pl-form input:focus, .modal input[type="text"]:focus { outline: none; border-color: var(--accent-1); }
-      .playlist-item {
-        display: flex; align-items: center; gap: 10px;
-        background: var(--surface-2); border: 1px solid var(--border);
-        border-radius: var(--radius); padding: 8px; cursor: grab;
-      }
-      .playlist-item.dragging { opacity: .4; }
-      .playlist-item.now { border-color: var(--accent-1); box-shadow: 0 0 0 1px var(--accent-1); }
-      .thumb {
-        width: 64px; height: 40px; border-radius: 8px; flex-shrink: 0;
-        display: flex; align-items: center; justify-content: center;
-        font-size: 18px; font-weight: 600; color: #fff;
-        background: linear-gradient(135deg, #3b3b5e, #23232f);
-      }
-      .playlist-item.now .thumb { background: var(--accent-grad); }
-      .pl-meta { flex: 1; min-width: 0; }
-      .pl-meta .tt { font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .pl-meta .st { font-size: 11px; color: var(--success); margin-top: 2px; }
-      .pl-actions { display: flex; gap: 4px; }
-      .mini-btn {
-        background: transparent; border: none; color: var(--muted); cursor: pointer;
-        font-size: 12px; padding: 6px 8px; border-radius: 7px; font-weight: 500;
-      }
-      .mini-btn:hover { background: rgba(255, 255, 255, .08); color: var(--text); }
-      .empty { text-align: center; color: var(--muted-dim); font-size: 13px; padding: 28px 12px; line-height: 1.8; }
-      .empty svg { width: 36px; height: 36px; opacity: .5; margin-bottom: 8px; }
-
-      /* ============ Polls ============ */
-      .poll-card { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; }
-      .poll-card .q { font-size: 15px; font-weight: 600; margin-bottom: 10px; }
-      .poll-option {
-        position: relative; overflow: hidden; border: 1px solid var(--border);
-        border-radius: 10px; margin-bottom: 8px; cursor: pointer; background: var(--surface);
-      }
-      .poll-option .fill { position: absolute; inset: 0; width: 0%; background: linear-gradient(90deg, rgba(124,92,255,.35), rgba(255,92,138,.3)); transition: width 400ms; }
-      .poll-option .row { position: relative; display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; font-size: 13px; }
-      .poll-option .pct { color: var(--muted); font-variant-numeric: tabular-nums; }
-      .poll-option:hover { border-color: var(--accent-1); }
-      .poll-option button { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
-      .poll-meta { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
-
-      /* ============ Modals ============ */
-      .modal-back {
-        position: fixed; inset: 0; z-index: 300; display: none;
-        align-items: center; justify-content: center; padding: 20px;
-        background: rgba(5, 5, 10, .7); backdrop-filter: blur(8px);
-      }
-      .modal-back.show { display: flex; }
-      .modal {
-        width: 440px; max-width: 100%; max-height: 90vh; overflow-y: auto;
-        background: var(--surface); border: 1px solid var(--border);
-        border-radius: 16px; box-shadow: var(--shadow); padding: 24px;
-      }
-      .modal h2 { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
-      .modal .sub { font-size: 13px; color: var(--muted); margin-bottom: 16px; }
-      .modal .x { float: right; }
-      .src-tabs { display: flex; gap: 6px; margin-bottom: 16px; background: var(--surface-2); padding: 4px; border-radius: var(--radius-pill); }
-      .src-tab { flex: 1; background: transparent; border: none; color: var(--muted); font-size: 13px; font-weight: 500; padding: 8px; border-radius: var(--radius-pill); cursor: pointer; }
-      .src-tab.active { background: var(--surface-3); color: var(--text); }
-      .src-pane { display: none; flex-direction: column; gap: 10px; }
-      .src-pane.active { display: flex; }
-      .sample-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-      .sample-btn {
-        border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
-        background: var(--surface-2); color: var(--text); cursor: pointer; padding: 0;
-        transition: transform var(--t), border-color var(--t);
-      }
-      .sample-btn:hover { transform: translateY(-2px); border-color: var(--accent-1); }
-      .sample-btn .swatch {
-        height: 64px; display: flex; align-items: center; justify-content: center;
-        font-size: 24px; font-weight: 600; color: #fff;
-      }
-      .sample-btn span { display: block; font-size: 12px; padding: 8px; }
-      .file-drop {
-        border: 1px dashed var(--border); border-radius: var(--radius);
-        padding: 28px 16px; text-align: center; color: var(--muted); font-size: 13px;
-        cursor: pointer; line-height: 1.8;
-      }
-      .file-drop:hover { border-color: var(--accent-1); color: var(--text); }
-      .keys-list { display: flex; flex-direction: column; gap: 10px; font-size: 14px; }
-      .keys-list .row { display: flex; justify-content: space-between; align-items: center; }
-      kbd {
-        background: var(--surface-3); border: 1px solid var(--border); border-bottom-width: 2px;
-        border-radius: 6px; padding: 2px 8px; font-size: 12px; font-family: inherit;
-      }
-
-      /* ============ Toasts ============ */
-      #toastWrap {
-        position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-        z-index: 400; display: flex; flex-direction: column; gap: 8px; align-items: center;
-        pointer-events: none;
-      }
-      .toast {
-        background: rgba(28, 28, 39, .95); backdrop-filter: blur(10px);
-        border: 1px solid var(--border); color: var(--text);
-        font-size: 13px; padding: 10px 18px; border-radius: var(--radius-pill);
-        box-shadow: var(--shadow); animation: toastIn 250ms ease-out;
-        display: flex; align-items: center; gap: 8px; max-width: 90vw;
-      }
-      .toast.out { opacity: 0; transform: translateY(8px); transition: opacity 250ms, transform 250ms; }
-      @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } }
-
-      /* ============ Join overlay ============ */
+      /* Join overlay */
       #joinOverlay {
-        position: fixed; inset: 0; z-index: 500;
-        display: flex; align-items: center; justify-content: center; padding: 20px;
-        background: radial-gradient(900px 500px at 50% 20%, rgba(124, 92, 255, .15), transparent 60%), rgba(5, 5, 10, .88);
-        backdrop-filter: blur(10px);
+        position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+        display: flex; align-items: center; justify-content: center; z-index: 200;
       }
-      .join-box {
-        background: var(--surface); border: 1px solid var(--border);
-        padding: 36px 32px; border-radius: 20px; width: 380px; max-width: 100%;
-        text-align: center; box-shadow: var(--shadow);
-      }
-      .join-box .logo-badge { width: 52px; height: 52px; border-radius: 14px; margin: 0 auto 14px; }
-      .join-box .logo-badge svg { width: 26px; height: 26px; }
-      .join-box h1 { font-size: 28px; font-weight: 600; }
-      .join-box h1 .grad { background: var(--accent-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
-      .join-box p { color: var(--muted); font-size: 14px; margin: 8px 0 20px; }
-      .join-box input {
-        width: 100%; margin-bottom: 10px; background: var(--surface-2);
-        border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px;
-        color: var(--text); font-size: 14px; font-family: inherit;
-      }
-      .join-box input:focus { outline: none; border-color: var(--accent-1); }
-      .join-box input#codeInput { text-transform: uppercase; text-align: center; letter-spacing: 3px; font-family: ui-monospace, Menlo, monospace; }
-      .join-box .btn-row { display: flex; gap: 8px; margin-top: 4px; }
+      .join-box { background: #222; padding: 32px; border-radius: 12px; width: 340px; text-align: center; }
+      .join-box h1 { margin-bottom: 6px; }
+      .join-box p { color: #aaa; font-size: 13px; margin-bottom: 16px; }
+      .join-box input { width: 100%; margin-bottom: 10px; text-transform: none; }
+      .join-box input#codeInput { text-transform: uppercase; text-align: center; letter-spacing: 2px; }
+      .join-box .btn-row { display: flex; gap: 8px; }
       .join-box .btn-row button { flex: 1; }
-      #joinError { color: var(--danger); font-size: 13px; min-height: 20px; margin-top: 10px; }
-
-      /* ============ Responsive ============ */
-      @media (max-width: 1100px) {
-        .layout { grid-template-columns: minmax(0, 1fr); }
-        .rail { display: none; }
-        .panel { position: static; max-height: none; }
-        .tabbar { position: sticky; top: 61px; z-index: 50; background: var(--surface); }
-        .video-wrap { position: sticky; top: 61px; z-index: 60; }
-        .chat { min-height: 240px; max-height: 50vh; }
-      }
-      @media (max-width: 640px) {
-        .topbar { flex-wrap: wrap; gap: 10px; padding: 10px 12px; }
-        .layout { padding: 12px 12px 20px; }
-        .logo span { display: none; }
-        #watchCount { display: none; }
-      }
-      @media (prefers-reduced-motion: reduce) {
-        *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
-      }
+      #joinError { color: #f66; font-size: 13px; min-height: 18px; margin-top: 8px; }
     </style>
   </head>
   <body>
-    <header class="topbar">
-      <div class="logo">
-        <span class="logo-badge" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3Z"/><path d="m6.2 5.3 3.1 3.9"/><path d="m12.4 3.4 3.1 4"/><path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg>
-        </span>
-        <span>CineSync</span>
-      </div>
-      <div class="room-pill" title="Click the code to copy an invite link">
-        <span class="room-code" id="roomCode" role="button" tabindex="0" aria-label="Room code, activate to copy invite link">------</span>
-        <button class="icon-btn" id="copyLinkBtn" aria-label="Copy invite link" style="width:32px;height:32px">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
-        </button>
-      </div>
-      <div class="conn"><span class="cdot" id="connDot"></span><span id="connStatus" class="status">connecting…</span></div>
-      <div class="avatars" id="avatarStack" aria-label="People watching"></div>
-      <div class="spacer"></div>
-      <div style="position:relative">
-        <button class="sync-badge" id="syncBadge" aria-haspopup="true" aria-expanded="false" aria-label="Sync status, show details">
-          <span class="cdot ok" id="syncDot"></span><span id="syncText">Synced</span>
-        </button>
-        <div class="pop" id="syncPop" style="right:0;top:44px" role="dialog" aria-label="Sync details">
-          <h4>Sync details</h4>
-          <div class="kv"><span>Drift</span><span id="driftLabel">—</span></div>
-          <div class="kv"><span>Clock offset</span><span id="clockLabel">—</span></div>
-          <div class="kv"><span>Playback rate</span><span id="rateLabel">1.0x</span></div>
-          <div class="kv"><span>Mode</span><span id="modeLabel"></span></div>
-        </div>
-      </div>
-      <span class="status" id="watchCount"></span>
-      <button class="icon-btn" id="keysBtn" aria-label="Keyboard shortcuts">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 8h.01M11 8h.01M15 8h.01M17 8h.01M7 12h.01M11 12h.01M15 12h.01M17 12h.01M7 16h10"/></svg>
-      </button>
-    </header>
-
-    <div class="layout">
-      <nav class="rail" aria-label="Panel navigation">
-        <button class="rail-btn active" data-tab="chat" aria-label="Chat">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
-          <span class="ping" id="chatPing"></span>
-        </button>
-        <button class="rail-btn" data-tab="people" aria-label="People">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-        </button>
-        <button class="rail-btn" data-tab="playlist" aria-label="Playlist">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 6 4 14"/><path d="M12 6v14"/><path d="M8 8v12"/><path d="M4 4v16"/></svg>
-        </button>
-        <button class="rail-btn" data-tab="polls" aria-label="Polls">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 13v5M12 9v9M17 5v13"/></svg>
-        </button>
-      </nav>
-
-      <main class="stage">
-        <div class="video-wrap" id="videoWrap">
-          <video id="video" playsinline preload="metadata"></video>
-          <div id="noVideoHint">No shared video loaded.<br />Open “Add video” below to pick a sample or paste a link.</div>
-          <div id="videoError" style="display:none;flex-direction:column">
-            <div><strong>Video failed to load.</strong></div>
-            <div class="status" id="videoErrorMsg"></div>
-            <button class="btn btn-secondary" id="retryBtn">Retry</button>
-          </div>
-          <div class="player-overlay" id="playerOverlay">
-            <div class="seek-row">
-              <div class="seek">
-                <div class="bufbar" id="bufBar"></div>
-                <input type="range" id="seekBar" min="0" max="1000" value="0" step="1" aria-label="Seek" />
-              </div>
-              <span class="time-label" id="timeLabel">0:00 / 0:00</span>
-            </div>
-            <div class="controls">
-              <button class="icon-btn" id="playPause" aria-label="Play or pause (Space)">
-                <svg id="playIcon" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"/></svg>
-                <svg id="pauseIcon" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="5" y="4" width="4" height="16" rx="1"/><rect x="15" y="4" width="4" height="16" rx="1"/></svg>
-              </button>
-              <button class="icon-btn" id="seekBack" aria-label="Back 10 seconds">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><text x="9" y="16" font-size="8" fill="currentColor" stroke="none" text-anchor="middle">10</text></svg>
-              </button>
-              <button class="icon-btn" id="seekFwd" aria-label="Forward 10 seconds">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><text x="15" y="16" font-size="8" fill="currentColor" stroke="none" text-anchor="middle">10</text></svg>
-              </button>
-              <div class="vol-wrap">
-                <button class="icon-btn" id="volBtn" aria-label="Mute or unmute (M)">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
-                </button>
-                <input type="range" id="volSlider" min="0" max="1" step="0.05" value="1" aria-label="Volume" />
-              </div>
-              <span class="grow"></span>
-              <div style="position:relative">
-                <button class="icon-btn" id="speedBtn" aria-label="Playback speed" aria-haspopup="true"><span class="speed-label" id="speedLabel">1x</span></button>
-                <div class="pop" id="speedMenu" style="right:0;bottom:48px" role="menu" aria-label="Playback speed"></div>
-              </div>
-              <button class="icon-btn" id="fsBtn" aria-label="Fullscreen (F)">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div id="errBar" role="alert"></div>
-
-        <div class="row" style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn btn-primary" id="sourceBtn">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-            Add video
-          </button>
-          <label class="btn btn-secondary" style="cursor:pointer">Open local file
-            <input id="fileInput" type="file" accept="video/*" style="display:none" />
-          </label>
-        </div>
-
-        <div class="react-bar" id="emojiRow" aria-label="Send a reaction">
-          <span class="lbl">React</span>
-          <button class="emoji-btn" data-emoji="🔥" aria-label="Fire reaction">🔥</button>
-          <button class="emoji-btn" data-emoji="😂" aria-label="Laugh reaction">😂</button>
-          <button class="emoji-btn" data-emoji="😮" aria-label="Wow reaction">😮</button>
-          <button class="emoji-btn" data-emoji="👍" aria-label="Thumbs up reaction">👍</button>
-          <button class="emoji-btn" data-emoji="❤️" aria-label="Heart reaction">❤️</button>
-        </div>
-      </main>
-
-      <aside class="panel" aria-label="Room panel">
-        <div class="tabbar" id="tabBar" role="tablist">
-          <button class="tab-btn active" data-tab="chat" role="tab" aria-selected="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
-            Chat<span class="count" id="chatBadge"></span>
-          </button>
-          <button class="tab-btn" data-tab="people" role="tab" aria-selected="false">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
-            People
-          </button>
-          <button class="tab-btn" data-tab="playlist" role="tab" aria-selected="false">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 6 4 14"/><path d="M12 6v14"/><path d="M8 8v12"/><path d="M4 4v16"/></svg>
-            Playlist
-          </button>
-          <button class="tab-btn" data-tab="polls" role="tab" aria-selected="false">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 13v5M12 9v9M17 5v13"/></svg>
-            Polls
-          </button>
-        </div>
-
-        <section class="tab active" id="tab-chat" role="tabpanel" aria-label="Chat">
-          <div class="chat" id="chat" aria-live="polite"><div class="chat-empty">No messages yet.<br />Say hi to the room.</div></div>
-          <button class="jump-btn" id="jumpBtn">↓ New messages</button>
-          <div class="chat-input-row">
-            <button class="icon-btn" id="emojiPickBtn" aria-label="Insert emoji" style="width:36px;height:36px">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" x2="9.01" y1="9" y2="9"/><line x1="15" x2="15.01" y1="9" y2="9"/></svg>
-            </button>
-            <div class="emoji-pop" id="emojiPop"></div>
-            <input id="chatInput" type="text" maxlength="500" placeholder="Message the room…" autocomplete="off" aria-label="Chat message" />
-            <button class="icon-btn send-btn" id="chatSend" aria-label="Send message">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
-            </button>
-          </div>
-        </section>
-
-        <section class="tab" id="tab-people" role="tabpanel" aria-label="People">
-          <div class="host-card">
-            <div class="t">Room controls</div>
-            <div class="switch-row">
-              <span>Everyone can control</span>
-              <label class="switch"><input type="checkbox" id="controlToggle" checked /><span class="track"></span></label>
-            </div>
-            <div class="status" id="controlNote" style="margin-top:6px"></div>
-          </div>
-          <div class="tab-scroll" id="participants" aria-live="polite"></div>
-        </section>
-
-        <section class="tab" id="tab-playlist" role="tabpanel" aria-label="Playlist">
-          <div class="pl-head">
-            <h3>Up next</h3>
-            <button class="btn btn-ghost" id="plAddToggle">+ Add</button>
-          </div>
-          <div class="pl-form" id="plForm">
-            <input id="videoTitleInput" type="text" placeholder="Video title" />
-            <input id="videoUrlInput" type="text" placeholder="Direct MP4/WebM URL (not YouTube)" />
-            <button class="btn btn-secondary" id="addVideoBtn">Add to playlist</button>
-          </div>
-          <div class="tab-scroll" id="playlist"></div>
-        </section>
-
-        <section class="tab" id="tab-polls" role="tabpanel" aria-label="Polls">
-          <div class="pl-head">
-            <h3>Polls</h3>
-            <button class="btn btn-ghost" id="pollNewBtn">+ New poll</button>
-          </div>
-          <div class="tab-scroll" id="poll"></div>
-        </section>
-      </aside>
-    </div>
-
-    <!-- Source modal -->
-    <div class="modal-back" id="sourceModal">
-      <div class="modal" role="dialog" aria-modal="true" aria-label="Add video">
-        <button class="icon-btn x" data-close aria-label="Close">✕</button>
-        <h2>Add video</h2>
-        <p class="sub">Shared with everyone in the room.</p>
-        <div class="src-tabs" role="tablist">
-          <button class="src-tab active" data-src="url" role="tab">Link</button>
-          <button class="src-tab" data-src="samples" role="tab">Samples</button>
-          <button class="src-tab" data-src="local" role="tab">Local file</button>
-        </div>
-        <div class="src-pane active" id="srcPaneUrl">
-          <input id="setVideoInput" type="text" placeholder="Direct MP4/WebM URL — not YouTube (host)" />
-          <button class="btn btn-primary" id="setVideoBtn">Set shared video</button>
-        </div>
-        <div class="src-pane" id="srcPaneSamples">
-          <div class="sample-grid">
-            <button class="sample-btn" data-sample="flower">
-              <span class="swatch" style="background:linear-gradient(135deg,#3DDC97,#1d7a54)">✿</span><span>Flower</span>
-            </button>
-            <button class="sample-btn" data-sample="bbb">
-              <span class="swatch" style="background:linear-gradient(135deg,#7C5CFF,#3a2d8f)">Bb</span><span>Buck Bunny</span>
-            </button>
-            <button class="sample-btn" data-sample="sintel">
-              <span class="swatch" style="background:linear-gradient(135deg,#FF5C8A,#8f2d4e)">Si</span><span>Sintel</span>
-            </button>
-          </div>
-        </div>
-        <div class="src-pane" id="srcPaneLocal">
-          <label class="file-drop">Drop a video file here, or click to browse.<br />Everyone opens the same file — positions stay in sync.
-            <input id="fileInputModal" type="file" accept="video/*" style="display:none" />
-          </label>
-          <p class="sub" style="margin:0">Tip: the file plays only on your screen; friends need the same file.</p>
-        </div>
-      </div>
-    </div>
-
-    <!-- Poll modal -->
-    <div class="modal-back" id="pollModal">
-      <div class="modal" role="dialog" aria-modal="true" aria-label="Create poll">
-        <button class="icon-btn x" data-close aria-label="Close">✕</button>
-        <h2>New poll</h2>
-        <p class="sub">Everyone votes, results update live.</p>
-        <div style="display:flex;flex-direction:column;gap:10px">
-          <input id="pollQInput" type="text" placeholder="Poll question — e.g. What next?" />
-          <input id="pollOptsInput" type="text" placeholder="Options, comma separated" />
-          <button class="btn btn-primary" id="createPollBtn">Start poll</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Shortcuts modal -->
-    <div class="modal-back" id="keysModal">
-      <div class="modal" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
-        <button class="icon-btn x" data-close aria-label="Close">✕</button>
-        <h2>Shortcuts</h2>
-        <p class="sub">Available anywhere outside text fields.</p>
-        <div class="keys-list">
-          <div class="row"><span>Play / pause</span><span><kbd>Space</kbd></span></div>
-          <div class="row"><span>Seek 10s</span><span><kbd>←</kbd> <kbd>→</kbd></span></div>
-          <div class="row"><span>Mute</span><span><kbd>M</kbd></span></div>
-          <div class="row"><span>Fullscreen</span><span><kbd>F</kbd></span></div>
-          <div class="row"><span>Focus chat</span><span><kbd>C</kbd></span></div>
-        </div>
-      </div>
-    </div>
-
-    <div id="toastWrap" aria-live="polite"></div>
-
     <div id="joinOverlay">
       <div class="join-box">
-        <div class="logo-badge" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="26" height="26"><path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3Z"/><path d="m6.2 5.3 3.1 3.9"/><path d="m12.4 3.4 3.1 4"/><path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg>
-        </div>
-        <h1>Cine<span class="grad">Sync</span></h1>
-        <p>Watch videos together, perfectly in sync.</p>
+        <h1>CineSync</h1>
+        <p>Watch videos together, in sync.</p>
         <input id="nameInput" type="text" maxlength="40" placeholder="Your name" autocomplete="off" />
         <input id="codeInput" type="text" maxlength="8" placeholder="Room code (blank = new room)" autocomplete="off" />
         <div class="btn-row">
-          <button id="createBtn" class="btn btn-primary">Create room</button>
-          <button id="joinBtn" class="btn btn-secondary">Join room</button>
+          <button id="createBtn">Create room</button>
+          <button id="joinBtn">Join room</button>
         </div>
         <div id="joinError"></div>
+      </div>
+    </div>
+
+    <div class="app">
+      <div class="sidebar">
+        <h2>Room</h2>
+        <div class="room-code" id="roomCode" title="Click to copy invite link">------</div>
+        <div id="connStatus" class="status">connecting…</div>
+        <div class="status" id="watchCount"></div>
+        <h3>Room controls</h3>
+        <label class="status" style="display:flex;gap:6px;align-items:center;cursor:pointer">
+          <input type="checkbox" id="controlToggle" checked /> Everyone can control
+        </label>
+        <div class="status" id="controlNote"></div>
+        <h3>Participants</h3>
+        <div id="participants"></div>
+        <h3>Playlist</h3>
+        <div id="playlist"></div>
+        <div class="row" style="margin-top:6px">
+          <input id="videoTitleInput" type="text" placeholder="Video title" />
+        </div>
+        <div class="row" style="margin-top:6px">
+          <input id="videoUrlInput" type="text" placeholder="Direct MP4/WebM URL (not YouTube)" />
+        </div>
+        <div class="row" style="margin-top:6px">
+          <button id="addVideoBtn">Add to playlist</button>
+        </div>
+        <h3>Poll</h3>
+        <div id="poll"></div>
+        <div class="row" style="margin-top:6px">
+          <input id="pollQInput" type="text" placeholder="Poll question" />
+        </div>
+        <div class="row" style="margin-top:6px">
+          <input id="pollOptsInput" type="text" placeholder="Options, comma separated" />
+        </div>
+        <div class="row" style="margin-top:6px">
+          <button id="createPollBtn">Start poll</button>
+        </div>
+      </div>
+
+      <div class="main">
+        <div class="video-wrap" id="videoWrap">
+          <video id="video" playsinline preload="metadata"></video>
+          <div id="noVideoHint">No shared video loaded.<br />Pick a sample below or paste a video URL and press “Set video”.</div>
+        </div>
+        <div id="errBar"></div>
+        <div class="controls">
+          <button id="playPause">Play</button>
+          <button id="seekBack">-10s</button>
+          <button id="seekFwd">+10s</button>
+          <span class="rate" id="rateLabel">1.0x</span>
+          <span class="status" id="driftLabel">drift: —</span>
+          <span class="status" id="clockLabel">sync: —</span>
+          <span class="status warn" id="modeLabel"></span>
+        </div>
+        <div class="row">
+          <input id="setVideoInput" type="text" placeholder="Set shared direct MP4/WebM URL — not YouTube (host)" />
+          <button id="setVideoBtn">Set video</button>
+          <button class="sample-btn" data-sample="flower">Flower</button>
+          <button class="sample-btn" data-sample="bbb">Buck Bunny</button>
+          <button class="sample-btn" data-sample="sintel">Sintel</button>
+          <label class="status" style="cursor:pointer">Open local file
+            <input id="fileInput" type="file" accept="video/*" style="display:none" />
+          </label>
+        </div>
+        <div class="row" id="emojiRow">
+          <button class="emoji-btn" data-emoji="🔥">🔥</button>
+          <button class="emoji-btn" data-emoji="😂">😂</button>
+          <button class="emoji-btn" data-emoji="😮">😮</button>
+          <button class="emoji-btn" data-emoji="👍">👍</button>
+          <button class="emoji-btn" data-emoji="❤️">❤️</button>
+        </div>
+        <div class="chat" id="chat"><div class="status">Chat will appear here…</div></div>
+        <div class="row">
+          <input id="chatInput" type="text" maxlength="500" placeholder="Type a message…" autocomplete="off" />
+          <button id="chatSend">Send</button>
+        </div>
       </div>
     </div>
 
@@ -818,29 +198,26 @@
     <script type="module">
       // ---------- DOM ----------
       const $ = (id) => document.getElementById(id);
-      const video = $('video'), videoWrap = $('videoWrap'), playerOverlay = $('playerOverlay');
-      const playPauseBtn = $('playPause'), playIcon = $('playIcon'), pauseIcon = $('pauseIcon');
-      const seekBackBtn = $('seekBack'), seekFwdBtn = $('seekFwd');
-      const seekBar = $('seekBar'), bufBar = $('bufBar'), timeLabel = $('timeLabel');
-      const volBtn = $('volBtn'), volSlider = $('volSlider'), fsBtn = $('fsBtn');
-      const speedBtn = $('speedBtn'), speedMenu = $('speedMenu'), speedLabel = $('speedLabel');
+      const video = $('video'), videoWrap = $('videoWrap');
+      const playPauseBtn = $('playPause'), seekBackBtn = $('seekBack'), seekFwdBtn = $('seekFwd');
       const rateLabel = $('rateLabel'), driftLabel = $('driftLabel'), clockLabel = $('clockLabel');
-      const syncBadge = $('syncBadge'), syncDot = $('syncDot'), syncText = $('syncText'), syncPop = $('syncPop');
-      const roomCodeEl = $('roomCode'), participantsEl = $('participants'), connStatus = $('connStatus'), connDot = $('connDot');
-      const avatarStack = $('avatarStack');
+      const roomCodeEl = $('roomCode'), participantsEl = $('participants'), connStatus = $('connStatus');
       const chatEl = $('chat'), chatInput = $('chatInput'), chatSend = $('chatSend');
-      const jumpBtn = $('jumpBtn'), chatBadge = $('chatBadge');
-      const emojiPickBtn = $('emojiPickBtn'), emojiPop = $('emojiPop');
       const emojiRow = $('emojiRow');
       const playlistEl = $('playlist'), videoTitleInput = $('videoTitleInput'), videoUrlInput = $('videoUrlInput');
-      const plAddToggle = $('plAddToggle'), plForm = $('plForm');
       const pollEl = $('poll'), pollQInput = $('pollQInput'), pollOptsInput = $('pollOptsInput');
       const setVideoInput = $('setVideoInput');
       const overlay = $('joinOverlay'), nameInput = $('nameInput'), codeInput = $('codeInput'), joinError = $('joinError');
-      const noVideoHint = $('noVideoHint'), videoError = $('videoError'), videoErrorMsg = $('videoErrorMsg');
-      const errBar = $('errBar'), modeLabel = $('modeLabel');
+      const noVideoHint = $('noVideoHint'), errBar = $('errBar'), modeLabel = $('modeLabel');
       const controlToggle = $('controlToggle'), controlNote = $('controlNote'), watchCount = $('watchCount');
-      const toastWrap = $('toastWrap');
+      let errTimer = null;
+
+      function showError(msg) {
+        errBar.textContent = msg;
+        errBar.style.display = 'block';
+        if (errTimer) clearTimeout(errTimer);
+        errTimer = setTimeout(() => { errBar.style.display = 'none'; }, 4000);
+      }
 
       // ---------- State ----------
       let socket = null;
@@ -848,16 +225,10 @@
       let myName = '', myRoomCode = '', myHostId = null, myEveryoneCanControl = true;
       let clientSeq = 0, baseVersion = 0, isPlaying = false;
       let clockOffset = 0, lastSyncAt = 0;
-      let userRate = 1;    // chosen in the speed menu
-      let rateCorr = 1;    // drift-correction factor; effective rate = userRate * rateCorr
       let playbackRate = 1;
       let storedState = { positionMs: 0, serverTimestampMs: Date.now(), rate: 1, status: 'paused', videoId: '' };
-      let lastDriftAbs = 0, consecutiveBeyond = 0, lastHardToast = 0;
+      let lastDriftAbs = 0, consecutiveBeyond = 0;
       let activePoll = null;
-      let localMode = false;
-      let knownIds = new Set();
-      let scrubbing = false;
-      let chatAtBottom = true, unreadChat = 0;
 
       const SAMPLES = {
         flower: '/media/flower.mp4',
@@ -865,67 +236,18 @@
         sintel: '/media/sintel-trailer.mp4'
       };
 
+      // YouTube/Vimeo/watch pages are not playable media files — catch early
+      // with a helpful message instead of a cryptic MEDIA_ERR (code 4).
       function isUnstreamableLink(url) {
         return /(youtube\.com|youtu\.be|vimeo\.com|dailymotion\.com|netflix\.com|twitch\.tv)/i.test(url || '');
       }
 
-      // ---------- Toasts ----------
-      function toast(msg) {
-        const d = document.createElement('div');
-        d.className = 'toast';
-        d.textContent = msg;
-        toastWrap.appendChild(d);
-        setTimeout(() => { d.classList.add('out'); setTimeout(() => d.remove(), 300); }, 3200);
-        while (toastWrap.children.length > 3) toastWrap.firstChild.remove();
-      }
-
-      let errTimer = null;
-      function showError(msg) {
-        errBar.textContent = msg;
-        errBar.style.display = 'block';
-        if (errTimer) clearTimeout(errTimer);
-        errTimer = setTimeout(() => { errBar.style.display = 'none'; }, 5000);
-      }
-
-      // ---------- Tabs / modals ----------
-      function switchTab(name) {
-        document.querySelectorAll('.tab-btn[data-tab]').forEach((b) => {
-          const on = b.dataset.tab === name;
-          b.classList.toggle('active', on);
-          b.setAttribute('aria-selected', on ? 'true' : 'false');
-        });
-        document.querySelectorAll('.rail-btn[data-tab]').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
-        document.querySelectorAll('.tab').forEach((s) => s.classList.toggle('active', s.id === 'tab-' + name));
-        if (name === 'chat') { unreadChat = 0; chatBadge.textContent = ''; chatBadge.classList.remove('show'); $('chatPing').classList.remove('show'); }
-      }
-      document.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => switchTab(b.dataset.tab)));
-
-      function openModal(id) { $(id).classList.add('show'); }
-      function closeModals() { document.querySelectorAll('.modal-back.show').forEach((m) => m.classList.remove('show')); }
-      document.querySelectorAll('[data-close]').forEach((b) => b.addEventListener('click', closeModals));
-      document.querySelectorAll('.modal-back').forEach((m) => m.addEventListener('click', (e) => { if (e.target === m) closeModals(); }));
-      document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeModals(); syncPop.classList.remove('show'); speedMenu.classList.remove('show'); emojiPop.classList.remove('show'); } });
-      $('sourceBtn').addEventListener('click', () => openModal('sourceModal'));
-      $('pollNewBtn').addEventListener('click', () => openModal('pollModal'));
-      $('keysBtn').addEventListener('click', () => openModal('keysModal'));
-      document.querySelectorAll('.src-tab').forEach((b) => b.addEventListener('click', () => {
-        document.querySelectorAll('.src-tab').forEach((x) => x.classList.toggle('active', x === b));
-        $('srcPaneUrl').classList.toggle('active', b.dataset.src === 'url');
-        $('srcPaneSamples').classList.toggle('active', b.dataset.src === 'samples');
-        $('srcPaneLocal').classList.toggle('active', b.dataset.src === 'local');
-      }));
-      plAddToggle.addEventListener('click', () => {
-        const open = plForm.classList.toggle('open');
-        plAddToggle.textContent = open ? '− Close' : '+ Add';
-      });
-
-      // ---------- Connection ----------
       function setConn(text, cls) {
         connStatus.textContent = text;
         connStatus.className = 'status' + (cls ? ' ' + cls : '');
-        connDot.className = 'cdot' + (cls ? ' ' + cls : '');
       }
 
+      // ---------- Socket setup ----------
       async function getIo() {
         if (window.io) return window.io;
         const m = await import('https://cdn.socket.io/4.7.2/socket.io.esm.min.js');
@@ -939,73 +261,17 @@
         return storedState.positionMs + (serverNow() - storedState.serverTimestampMs) * storedState.rate;
       }
 
-      function effRate() { return userRate * rateCorr; }
-      function paintRate() {
-        playbackRate = effRate();
-        try { video.playbackRate = playbackRate; } catch (e) {}
-        rateLabel.textContent = playbackRate.toFixed(1) + 'x';
-        speedLabel.textContent = (Number.isInteger(userRate) ? userRate : userRate.toFixed(2).replace(/0$/, '')) + 'x';
-      }
-      function paintSpeedMenu() {
-        speedMenu.querySelectorAll('.speed-opt').forEach((o) => o.classList.toggle('current', parseFloat(o.dataset.rate) === userRate));
-      }
-
-      // Speed menu
-      const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
-      speedMenu.innerHTML = SPEEDS.map((s) =>
-        '<button class="speed-opt' + (s === 1 ? ' current' : '') + '" data-rate="' + s + '" role="menuitem">' + s + 'x' + (s === 1 ? ' (sync default)' : '') + '</button>'
-      ).join('');
-      speedBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        syncPop.classList.remove('show');
-        speedMenu.classList.toggle('show');
-      });
-      speedMenu.addEventListener('click', (e) => {
-        const b = e.target.closest ? e.target.closest('[data-rate]') : null;
-        if (!b) return;
-        userRate = parseFloat(b.dataset.rate);
-        rateCorr = 1; // deliberate choice resets accumulated correction
-        paintRate();
-        paintSpeedMenu();
-        speedMenu.classList.remove('show');
-        consecutiveBeyond = 0; lastDriftAbs = 0;
-        // Share with the room so everyone plays at this speed
-        // (permissions follow the room control toggle; rejections revert via error handler).
-        if (joined && socket) {
-          clientSeq++;
-          socket.emit('set-rate', { rate: userRate, clientSeq, baseVersion });
-        }
-      });
-      document.addEventListener('click', (e) => {
-        if (!e.target.closest || (!e.target.closest('#speedMenu') && !e.target.closest('#speedBtn'))) speedMenu.classList.remove('show');
-        if (!e.target.closest || (!e.target.closest('#syncPop') && !e.target.closest('#syncBadge'))) { syncPop.classList.remove('show'); syncBadge.setAttribute('aria-expanded', 'false'); }
-        if (!e.target.closest || (!e.target.closest('#emojiPop') && !e.target.closest('#emojiPickBtn'))) emojiPop.classList.remove('show');
-        const openMenu = document.querySelector('.kebab-menu.show');
-        if (openMenu && !e.target.closest('.kebab-wrap')) openMenu.classList.remove('show');
-      });
-      syncBadge.addEventListener('click', (e) => {
-        e.stopPropagation();
-        speedMenu.classList.remove('show');
-        const open = syncPop.classList.toggle('show');
-        syncBadge.setAttribute('aria-expanded', open ? 'true' : 'false');
-      });
-
-      function setSyncBadge(state) {
-        // state: ok | warn
-        syncDot.className = 'cdot ' + state;
-        syncBadge.classList.remove('ok', 'warn');
-        syncBadge.classList.add(state);
-        syncText.textContent = state === 'ok' ? 'Synced' : 'Correcting…';
-      }
-
       function wireSocket(ioFn) {
         const url = location.protocol.startsWith('http') ? undefined : 'http://localhost:3000';
         socket = url ? ioFn(url) : ioFn();
-        window._socket = socket;
+        window._socket = socket; // handy for debugging
 
         socket.on('connect', () => {
           setConn('connected', 'ok');
-          socket.emit('client-hello', { clientTime: Date.now() });
+          // clock sync handshake
+          const t = Date.now();
+          socket.emit('client-hello', { clientTime: t });
+          // re-join after a drop so playback resumes
           if (joined) socket.emit('join-room', { roomCode: myRoomCode, name: myName });
         });
 
@@ -1014,26 +280,19 @@
         socket.on('sync-ack', (data) => {
           clockOffset = data.offset || 0;
           lastSyncAt = Date.now();
-          clockLabel.textContent = Math.round(clockOffset) + ' ms';
+          clockLabel.textContent = 'sync: ' + Math.round(clockOffset) + 'ms';
         });
 
         socket.on('server-time', (data) => {
           clockOffset = (Date.now() - data.serverTime) / 2;
           lastSyncAt = Date.now();
-          clockLabel.textContent = Math.round(clockOffset) + ' ms';
+          clockLabel.textContent = 'sync: ' + Math.round(clockOffset) + 'ms';
         });
 
         socket.on('room-snapshot', onSnapshot);
         socket.on('room-snapshot-resume', (data) => {
           baseVersion = data.version;
-          if (data.roomCode) { myRoomCode = data.roomCode; roomCodeEl.textContent = myRoomCode; }
-          if ('hostId' in data) myHostId = data.hostId;
-          if ('everyoneCanControl' in data) {
-            myEveryoneCanControl = data.everyoneCanControl !== false;
-            controlToggle.checked = myEveryoneCanControl;
-          }
           applyState(data.playbackState, true);
-          toast('Reconnected — back in sync.');
         });
 
         function applyRoomMeta(data) {
@@ -1049,26 +308,13 @@
 
         socket.on('participants-update', (data) => {
           applyRoomMeta(data);
-          const list = data.participants || [];
-          // Join/leave toasts (skip the very first baseline set in onSnapshot)
-          if (joined && knownIds.size) {
-            const ids = new Set(list.map((p) => p.id));
-            list.forEach((p) => { if (!knownIds.has(p.id)) toast(p.name + ' joined the room'); });
-            knownIds.forEach((id) => {
-              if (!ids.has(id)) {
-                const gone = lastParticipants.find((p) => p.id === id);
-                toast((gone ? gone.name : 'Someone') + ' left');
-              }
-            });
-          }
-          knownIds = new Set(list.map((p) => p.id));
-          renderParticipants(list);
+          renderParticipants(data.participants || []);
         });
 
         socket.on('room-settings', (data) => {
           applyRoomMeta(data);
           renderParticipants(lastParticipants);
-          toast(data.everyoneCanControl ? 'Everyone can now control playback.' : 'Host-only control is on.');
+          addChat('System', data.everyoneCanControl ? 'Everyone can now control playback.' : 'Only the host can control playback now.', false);
         });
 
         socket.on('state-update', (data) => {
@@ -1076,7 +322,7 @@
           applyState(data.playbackState, false);
         });
 
-        socket.on('chat-message', (data) => addChat(data.name, data.text, data.userId === socket.id, data.serverTimestampMs));
+        socket.on('chat-message', (data) => addChat(data.name, data.text, data.userId === socket.id));
         socket.on('reaction', (data) => showReaction(data.emoji));
 
         socket.on('playlist-update', (data) => {
@@ -1085,14 +331,14 @@
         });
 
         socket.on('poll-update', (data) => {
-          if (data.type === 'create') { activePoll = data.poll; renderPoll(); switchTab('polls'); toast('New poll: ' + data.poll.question); }
+          if (data.type === 'create') { activePoll = data.poll; renderPoll(); }
           else if (data.type === 'vote') {
             if (activePoll && activePoll.id === data.pollId) {
               activePoll.votes[data.userId] = data.optionId;
               renderPoll();
             }
           } else if (data.type === 'close') {
-            if (activePoll && activePoll.id === data.pollId) { activePoll.status = 'closed'; renderPoll(); toast('Poll closed.'); }
+            if (activePoll && activePoll.id === data.pollId) { activePoll.status = 'closed'; renderPoll(); }
           }
         });
 
@@ -1100,7 +346,7 @@
           if (data && data.newHostId) myHostId = data.newHostId;
           renderControlNote();
           renderParticipants(lastParticipants);
-          toast(myHostId === socket.id ? 'You are now the host.' : 'Host transferred.');
+          addChat('System', 'Host transferred.', false);
         });
 
         socket.on('error', (data) => {
@@ -1108,6 +354,8 @@
           if (!joined) {
             joinError.textContent = msg;
           } else {
+            // Our optimistic UI change was rejected: adopt the server's truth
+            // (version + playback state) so controls keep working.
             if (data && typeof data.version === 'number') baseVersion = data.version;
             if (data && data.playbackState) applyState(data.playbackState, false);
             if (!/resync/i.test(msg)) showError(msg);
@@ -1115,16 +363,21 @@
           console.warn('server error:', msg);
         });
 
+        // periodic clock re-sync
         setInterval(() => {
           if (socket && socket.connected) socket.emit('client-hello', { clientTime: Date.now() });
         }, 30000);
       }
 
       // ---------- Playback ----------
+      // Local-file mode: user picked their own file. Positional sync still
+      // applies, but state updates must NOT overwrite the blob: source.
+      let localMode = false;
+
       function resolveSrc(videoId) {
         if (!videoId) return '';
         if (/^(https?:\/\/|blob:|data:)/i.test(videoId) || videoId.startsWith('/')) return videoId;
-        return '/watch/' + videoId;
+        return '/watch/' + videoId; // bare ids only
       }
 
       function loadVideoSource(videoId) {
@@ -1135,95 +388,9 @@
         let target = '';
         try { target = new URL(src, location.href).href; } catch (e) { return; }
         if (current !== target) {
-          videoError.style.display = 'none';
           try { video.src = src; } catch (e) { console.warn('video load failed', e); }
         }
       }
-
-      function fmtTime(s) {
-        if (!isFinite(s) || s < 0) s = 0;
-        s = Math.floor(s);
-        const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
-        const mm = h ? String(m).padStart(2, '0') : String(m);
-        return (h ? h + ':' : '') + mm + ':' + String(sec).padStart(2, '0');
-      }
-
-      function paintSeek() {
-        const dur = video.duration;
-        if (!isFinite(dur) || dur <= 0) {
-          seekBar.value = 0;
-          seekBar.style.setProperty('--seek-fill', 'rgba(255,255,255,.15)');
-          timeLabel.textContent = fmtTime(video.currentTime) + ' / --:--';
-          return;
-        }
-        if (!scrubbing) seekBar.value = Math.round((video.currentTime / dur) * 1000);
-        const pct = (seekBar.value / 1000) * 100;
-        seekBar.style.setProperty('--seek-fill', 'linear-gradient(90deg, var(--accent-1) ' + pct + '%, rgba(255,255,255,.15) ' + pct + '%)');
-        try {
-          if (video.buffered.length) {
-            const end = video.buffered.end(video.buffered.length - 1);
-            bufBar.style.width = Math.min(100, (end / dur) * 100) + '%';
-          }
-        } catch (e) {}
-        timeLabel.textContent = fmtTime(video.currentTime) + ' / ' + fmtTime(dur);
-      }
-      video.addEventListener('timeupdate', paintSeek);
-      video.addEventListener('loadedmetadata', paintSeek);
-      video.addEventListener('progress', paintSeek);
-
-      seekBar.addEventListener('input', () => {
-        scrubbing = true;
-        const dur = video.duration;
-        if (isFinite(dur) && dur > 0) {
-          video.currentTime = (seekBar.value / 1000) * dur;
-          paintSeek();
-        }
-      });
-      seekBar.addEventListener('change', () => {
-        scrubbing = false;
-        if (!joined || !socket) return;
-        clientSeq++;
-        socket.emit('seek', { positionMs: Math.round(video.currentTime * 1000), clientSeq, baseVersion });
-      });
-
-      function seekBySecs(delta) {
-        if (!joined || !socket || !isFinite(video.duration)) return;
-        video.currentTime = Math.max(0, Math.min(video.currentTime + delta, video.duration || video.currentTime + delta));
-        clientSeq++;
-        socket.emit('seek', { positionMs: Math.round(video.currentTime * 1000), clientSeq, baseVersion });
-      }
-
-      volSlider.addEventListener('input', () => {
-        video.muted = false;
-        video.volume = parseFloat(volSlider.value);
-      });
-      function toggleMute() {
-        video.muted = !video.muted;
-        if (!video.muted && video.volume === 0) { video.volume = 0.8; volSlider.value = 0.8; }
-      }
-      volBtn.addEventListener('click', toggleMute);
-      function toggleFullscreen() {
-        if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-        else videoWrap.requestFullscreen().catch(() => {});
-      }
-      fsBtn.addEventListener('click', toggleFullscreen);
-
-      // Overlay auto-hide after 3s idle (never hide while paused)
-      let idleTimer = null;
-      function pokeOverlay() {
-        videoWrap.classList.remove('idle');
-        if (idleTimer) clearTimeout(idleTimer);
-        idleTimer = setTimeout(() => { if (!video.paused) videoWrap.classList.add('idle'); }, 3000);
-      }
-      ['mousemove', 'touchstart'].forEach((ev) => videoWrap.addEventListener(ev, pokeOverlay, { passive: true }));
-      videoWrap.addEventListener('focusin', pokeOverlay);
-      video.addEventListener('pause', () => videoWrap.classList.remove('idle'));
-      pokeOverlay();
-
-      video.addEventListener('loadstart', () => videoWrap.classList.add('loading'));
-      video.addEventListener('canplay', () => { videoWrap.classList.remove('loading'); videoError.style.display = 'none'; paintSeek(); });
-      video.addEventListener('waiting', () => { driftLabel.textContent = 'buffering…'; driftLabel.className = 'status warn'; setSyncBadge('warn'); });
-      video.addEventListener('playing', () => { consecutiveBeyond = 0; lastDriftAbs = 0; setSyncBadge('ok'); });
 
       function updateNoVideoHint() {
         const hasSrc = !!(video.currentSrc || video.src) && !video.src.endsWith(location.pathname);
@@ -1234,59 +401,44 @@
 
       video.addEventListener('error', () => {
         const err = video.error;
-        videoWrap.classList.remove('loading');
         if (!err || !video.src) { updateNoVideoHint(); return; }
         const hints = {
-          1: 'Playback was aborted — press Play to try again.',
-          2: 'Network error — the file may be unreachable. Try a sample below.',
-          3: 'Decoding error — this file looks corrupt. Try another source.',
+          1: 'aborted — try pressing Play again.',
+          2: 'network error — the file may be unreachable. Try a sample below.',
+          3: 'decoding error — this file looks corrupt. Try another source.',
           4: isUnstreamableLink(video.src)
-            ? 'Page links (YouTube, Vimeo…) are not playable files — use “Add video” for a direct MP4/WebM link, a sample, or a local file.'
-            : 'Format not supported — use a direct MP4/WebM link, a sample, or a local file.'
+            ? 'page links (YouTube, Vimeo…) are not playable — paste a direct MP4/WebM file URL instead.'
+            : 'format not supported — use a direct MP4/WebM file URL, a sample, or a local file.'
         };
-        videoErrorMsg.textContent = 'Error code ' + err.code + '. ' + (hints[err.code] || 'Unknown error.');
-        videoError.style.display = 'flex';
-        showError('Video failed to load (code ' + err.code + ').');
+        showError('Video failed to load (code ' + err.code + '): ' + (hints[err.code] || 'unknown error.'));
         updateNoVideoHint();
       });
-      $('retryBtn').addEventListener('click', () => {
-        videoError.style.display = 'none';
-        try { video.load(); video.play().catch(() => {}); } catch (e) {}
-      });
-
-      function setPlayingUI(playing) {
-        isPlaying = playing;
-        playIcon.style.display = playing ? 'none' : '';
-        pauseIcon.style.display = playing ? '' : 'none';
-        playPauseBtn.setAttribute('aria-label', playing ? 'Pause (Space)' : 'Play (Space)');
-      }
 
       function applyState(ps, hard) {
         storedState = ps;
-        // Server is the source of truth for speed: adopt it (covers remote
-        // changes, echoes of our own choice, and revert after rejections).
-        userRate = ps.rate || 1;
-        if (hard) rateCorr = 1; // fresh position: drop accumulated correction
-        paintRate();
-        paintSpeedMenu();
+        playbackRate = ps.rate || 1;
+        video.playbackRate = playbackRate;
+        rateLabel.textContent = Number(playbackRate).toFixed(1) + 'x';
         loadVideoSource(ps.videoId);
         updateNoVideoHint();
         const expected = ps.status === 'paused'
           ? ps.positionMs
-          : ps.positionMs + (serverNow() - ps.serverTimestampMs) * (ps.rate || 1);
+          : ps.positionMs + (serverNow() - ps.serverTimestampMs) * playbackRate;
+        // Re-seek only when meaningfully off (120ms keeps us inside the
+        // 100ms dead zone's spirit and avoids seek churn on every update).
+        // Never fight the player while it is seeking or still buffering.
         if (hard || video.seeking || video.readyState < 3) {
           if (hard) { try { video.currentTime = Math.max(0, expected / 1000); } catch (e) {} }
         } else if (Math.abs(video.currentTime * 1000 - expected) > 120 || !isFinite(video.currentTime)) {
           try { video.currentTime = Math.max(0, expected / 1000); } catch (e) {}
         }
         if (ps.status === 'playing' && !isPlaying) {
-          setPlayingUI(true);
+          isPlaying = true; playPauseBtn.textContent = 'Pause';
           video.play().catch(() => {});
         } else if (ps.status !== 'playing' && isPlaying) {
-          setPlayingUI(false);
+          isPlaying = false; playPauseBtn.textContent = 'Play';
           video.pause();
         }
-        paintSeek();
       }
 
       function onSnapshot(data) {
@@ -1300,14 +452,12 @@
           controlToggle.checked = myEveryoneCanControl;
         }
         baseVersion = data.version || 0;
-        knownIds = new Set((data.participants || []).map((p) => p.id));
         renderParticipants(data.participants || []);
         renderPlaylist(data.playlist || []);
         chatEl.innerHTML = '';
         (data.chatMessages || []).forEach((m) => addChat(m.name, m.text, false));
         applyState(data.playbackState, true);
         setConn('connected · room ' + myRoomCode, 'ok');
-        toast('Joined room ' + myRoomCode);
       }
 
       // Drift detection + correction every 2s
@@ -1317,10 +467,11 @@
         const actual = (isFinite(video.currentTime) ? video.currentTime : 0) * 1000;
         const drift = actual - expected;
         const abs = Math.abs(drift);
-        if (video.readyState >= 3 && !video.seeking) {
-          driftLabel.textContent = Math.round(drift) + ' ms';
-          driftLabel.className = 'status' + (abs < 100 ? ' ok' : abs <= 500 ? ' warn' : ' err');
-        }
+        driftLabel.textContent = 'drift: ' + Math.round(drift) + 'ms';
+        driftLabel.className = 'status' + (abs < 100 ? ' ok' : abs <= 500 ? ' warn' : ' err');
+
+        // Don't fight the player: skip correction while paused, seeking,
+        // stalled (buffering), or when the browser hasn't enough data yet.
         if (storedState.status === 'paused' || video.paused || video.seeking || video.readyState < 3) {
           if (abs < 100) { consecutiveBeyond = 0; lastDriftAbs = 0; }
           return;
@@ -1332,189 +483,32 @@
           return;
         }
         if (abs < 100) {
+          // Back in the dead zone: ease the local rate back to the room rate
+          // so soft-correction residue doesn't accumulate into oscillation.
           consecutiveBeyond = 0; lastDriftAbs = 0;
-          if (Math.abs(rateCorr - 1) > 0.005) {
-            rateCorr += (1 - rateCorr) * 0.5;
-            paintRate();
+          const target = storedState.rate || 1;
+          if (Math.abs(playbackRate - target) > 0.005) {
+            playbackRate += (target - playbackRate) * 0.5;
+            video.playbackRate = playbackRate;
+            rateLabel.textContent = playbackRate.toFixed(1) + 'x';
           }
-          setSyncBadge('ok');
         }
         else if (abs > 500) {
           try { video.currentTime = Math.max(0, expected / 1000); } catch (e) {}
           consecutiveBeyond = 0; lastDriftAbs = 0;
-          setSyncBadge('warn');
-          if (Date.now() - lastHardToast > 15000) {
-            lastHardToast = Date.now();
-            toast('Sync corrected (' + Math.round(drift) + 'ms drift).');
-          }
         } else {
           const dir = drift > 0 ? 1 : -1;
-          rateCorr = Math.max(0.5, Math.min(1.5, rateCorr + dir * 0.02));
-          if (effRate() < 0.5 || effRate() > 1.75) rateCorr = Math.max(0.5, Math.min(1.5, 1 / userRate));
-          paintRate();
-          setSyncBadge('warn');
+          playbackRate = Math.max(0.5, Math.min(1.5, playbackRate + dir * 0.02));
+          video.playbackRate = playbackRate;
+          rateLabel.textContent = playbackRate.toFixed(1) + 'x';
         }
       }, 2000);
 
-      // ---------- Controls ----------
-      function togglePlay() {
-        if (!joined || !socket) return;
-        const want = storedState.status === 'playing' ? 'paused' : 'playing';
-        setPlayingUI(want === 'playing');
-        if (want === 'playing') video.play().catch(() => {});
-        else video.pause();
-        clientSeq++;
-        socket.emit('play-pause', { status: want, clientSeq, baseVersion });
-      }
-      playPauseBtn.addEventListener('click', togglePlay);
-      video.addEventListener('click', togglePlay);
-      seekFwdBtn.addEventListener('click', () => seekBySecs(10));
-      seekBackBtn.addEventListener('click', () => seekBySecs(-10));
+      // Buffering indicator so stalls read as "loading", not "broken"
+      video.addEventListener('waiting', () => { driftLabel.textContent = 'buffering…'; driftLabel.className = 'status warn'; });
+      video.addEventListener('playing', () => { consecutiveBeyond = 0; lastDriftAbs = 0; });
 
-      document.addEventListener('keydown', (e) => {
-        const t = e.target;
-        if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
-        if (!joined) return;
-        if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
-        else if (e.key === 'ArrowRight') { e.preventDefault(); seekBySecs(10); }
-        else if (e.key === 'ArrowLeft') { e.preventDefault(); seekBySecs(-10); }
-        else if (e.key === 'm' || e.key === 'M') toggleMute();
-        else if (e.key === 'f' || e.key === 'F') toggleFullscreen();
-        else if (e.key === 'c' || e.key === 'C') { chatInput.focus(); }
-        else if (e.key === '?') openModal('keysModal');
-      });
-
-      // ---------- Chat ----------
-      chatEl.addEventListener('scroll', () => {
-        chatAtBottom = chatEl.scrollHeight - chatEl.scrollTop - chatEl.clientHeight < 40;
-        if (chatAtBottom) { unreadChat = 0; jumpBtn.classList.remove('show'); chatBadge.textContent = ''; chatBadge.classList.remove('show'); }
-      });
-      jumpBtn.addEventListener('click', () => {
-        chatEl.scrollTop = chatEl.scrollHeight;
-        chatAtBottom = true; unreadChat = 0;
-        jumpBtn.classList.remove('show'); chatBadge.textContent = ''; chatBadge.classList.remove('show');
-      });
-
-      function initials(name) {
-        return String(name || '?').trim().split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
-      }
-      function fmtClock(ts) {
-        try {
-          const d = new Date(ts);
-          return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        } catch (e) { return ''; }
-      }
-
-      function addChat(who, text, mine, ts) {
-        const empty = chatEl.querySelector('.chat-empty');
-        if (empty) empty.remove();
-        const d = document.createElement('div');
-        if (who === 'System') {
-          d.className = 'msg sys';
-          const b = document.createElement('div');
-          b.className = 'bubble';
-          b.textContent = text;
-          d.appendChild(b);
-        } else {
-          d.className = 'msg' + (mine ? ' mine' : '');
-          const av = document.createElement('span');
-          av.className = 'av';
-          av.textContent = initials(who);
-          const b = document.createElement('div');
-          b.className = 'bubble';
-          const meta = document.createElement('div');
-          meta.className = 'meta';
-          const nm = document.createElement('span');
-          nm.textContent = who;
-          meta.appendChild(nm);
-          if (ts) {
-            const tm = document.createElement('span');
-            tm.textContent = fmtClock(ts);
-            meta.appendChild(tm);
-          }
-          b.appendChild(meta);
-          const tx = document.createElement('div');
-          tx.className = 'text';
-          tx.textContent = text;
-          b.appendChild(tx);
-          if (mine) { d.appendChild(b); d.appendChild(av); }
-          else { d.appendChild(av); d.appendChild(b); }
-        }
-        const stick = chatAtBottom;
-        chatEl.appendChild(d);
-        if (stick) chatEl.scrollTop = chatEl.scrollHeight;
-        else if (who !== 'System') {
-          unreadChat++;
-          jumpBtn.textContent = '↓ ' + unreadChat + ' new message' + (unreadChat === 1 ? '' : 's');
-          jumpBtn.classList.add('show');
-          chatBadge.textContent = unreadChat;
-          chatBadge.classList.add('show');
-          $('chatPing').textContent = unreadChat;
-          $('chatPing').classList.add('show');
-          const activeTab = document.querySelector('.tab-btn[data-tab="chat"]');
-          if (!activeTab || !activeTab.classList.contains('active')) switchTab('chat');
-        }
-      }
-
-      function sendChat() {
-        const v = chatInput.value.trim();
-        if (!v || !joined) return;
-        clientSeq++;
-        socket.emit('chat-message', { text: v, clientSeq, baseVersion, userId: socket ? socket.id : '' });
-        chatInput.value = '';
-      }
-      chatSend.addEventListener('click', sendChat);
-      chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendChat(); });
-
-      // Chat emoji picker (inserts into the input; separate class from reaction bar)
-      const PICK_EMOJIS = ['😀','😂','😮','😢','😡','👍','👎','❤️','🔥','🎉','👏','🤔'];
-      emojiPop.innerHTML = PICK_EMOJIS.map((e) => '<button data-e="' + e + '" aria-label="Insert ' + e + '">' + e + '</button>').join('');
-      emojiPickBtn.addEventListener('click', (e) => { e.stopPropagation(); emojiPop.classList.toggle('show'); chatInput.focus(); });
-      emojiPop.addEventListener('click', (e) => {
-        const b = e.target.closest ? e.target.closest('[data-e]') : null;
-        if (!b) return;
-        const s = chatInput.selectionStart || chatInput.value.length;
-        chatInput.value = chatInput.value.slice(0, s) + b.dataset.e + chatInput.value.slice(chatInput.selectionEnd || s);
-        chatInput.focus();
-        emojiPop.classList.remove('show');
-      });
-
-      // Reaction bar: floats over video for everyone
-      emojiRow.addEventListener('click', (e) => {
-        const t = e.target.closest ? e.target.closest('.emoji-btn') : null;
-        if (!t || !joined) return;
-        clientSeq++;
-        socket.emit('reaction', { emoji: t.dataset.emoji, clientSeq, baseVersion, userId: socket.id });
-        showReaction(t.dataset.emoji);
-      });
-
-      function showReaction(emoji) {
-        const s = document.createElement('span');
-        s.className = 'reaction-float';
-        s.textContent = emoji;
-        s.style.left = (20 + Math.random() * 60) + '%';
-        s.style.bottom = '140px';
-        videoWrap.appendChild(s);
-        setTimeout(() => s.remove(), 3000);
-      }
-
-      // ---------- Playlist ----------
-      $('addVideoBtn').addEventListener('click', () => {
-        if (!joined) return;
-        const title = videoTitleInput.value.trim() || videoUrlInput.value.trim();
-        const movieId = videoUrlInput.value.trim();
-        if (!movieId) return;
-        if (isUnstreamableLink(movieId)) {
-          showError('That looks like a watch-page link (YouTube etc.) — those cannot stream. Paste a direct MP4/WebM URL.');
-          return;
-        }
-        clientSeq++;
-        socket.emit('add-video', { movieId, title, clientSeq, baseVersion, userId: socket.id });
-        videoTitleInput.value = ''; videoUrlInput.value = '';
-        plForm.classList.remove('open');
-        plAddToggle.textContent = '+ Add';
-      });
-
+      // ---------- UI render ----------
       let lastParticipants = [];
 
       function isHost() { return !!(socket && myHostId && socket.id === myHostId); }
@@ -1529,57 +523,31 @@
       function renderParticipants(list) {
         lastParticipants = list || [];
         const me = socket ? socket.id : '';
-        const mine = isHost();
         watchCount.textContent = lastParticipants.length
-          ? lastParticipants.length + (lastParticipants.length === 1 ? ' person' : ' people')
+          ? lastParticipants.length + (lastParticipants.length === 1 ? ' person watching' : ' people watching')
           : '';
-        avatarStack.innerHTML = lastParticipants.slice(0, 5).map((p) =>
-          '<span class="av" style="background:' + avatarColor(p.id) + '" title="' + escapeHtml(p.name) + '">' + initials(p.name) + '</span>'
-        ).join('') + (lastParticipants.length > 5 ? '<span class="av">+' + (lastParticipants.length - 5) + '</span>' : '');
         participantsEl.innerHTML = lastParticipants.map((p) =>
-          '<div class="person">' +
-          '<span class="av" style="background:' + avatarColor(p.id) + '">' + initials(p.name) + '<span class="on"></span></span>' +
-          '<span class="nm">' + escapeHtml(p.name) + '</span>' +
-          (p.id === me ? '<span class="pill you">YOU</span>' : '') +
-          (p.id === myHostId ? '<span class="pill host">HOST</span>' : '') +
-          (mine && p.id !== me
-            ? '<span class="kebab-wrap"><button class="icon-btn kebab-btn" data-kebab="' + p.id + '" aria-label="Manage ' + escapeHtml(p.name) + '" style="width:32px;height:32px">⋯</button>' +
-              '<span class="kebab-menu"><button data-makehost="' + p.id + '">Make host</button>' +
-              '<button class="danger" data-remove="' + p.id + '">Remove</button></span></span>'
-            : '') +
+          '<div class="participant">' +
+          '<span class="dot"></span><span>' + escapeHtml(p.name) + '</span>' +
+          (p.id === me ? '<span class="host-badge">YOU</span>' : '') +
+          (p.id === myHostId ? '<span class="host-badge">HOST</span>' : '') +
           '</div>'
         ).join('');
         renderControlNote();
       }
 
-      function thumbColor(id) {
-        let h = 0;
-        for (let i = 0; i < String(id).length; i++) h = (h * 31 + String(id).charCodeAt(i)) % 360;
-        return 'linear-gradient(135deg, hsl(' + h + ',55%,42%), hsl(' + ((h + 60) % 360) + ',50%,26%))';
-      }
-
       function renderPlaylist(list) {
-        if (!list.length) {
-          playlistEl.innerHTML = '<div class="empty">' +
-            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect width="18" height="18" x="3" y="3" rx="3"/><path d="m10 9 5 3-5 3V9Z"/></svg>' +
-            '<div>Playlist is empty.<br />Tap <strong>+ Add</strong> to queue the next video.</div></div>';
-          return;
-        }
+        if (!list.length) { playlistEl.innerHTML = '<div class="status">Empty — add a video below.</div>'; return; }
         playlistEl.innerHTML = list.map((it) =>
-          '<div class="playlist-item' + (storedState.videoId && it.movieId === storedState.videoId ? ' now' : '') + '" draggable="true" data-id="' + it.id + '">' +
-          '<span class="thumb" style="background:' + thumbColor(it.id) + '">' + escapeHtml((it.title || it.movieId || '?').trim()[0].toUpperCase()) + '</span>' +
-          '<span class="pl-meta"><span class="tt">' + escapeHtml(it.title || it.movieId) + '</span>' +
-          (storedState.videoId && it.movieId === storedState.videoId ? '<span class="st">● Now playing</span>' : '') + '</span>' +
-          '<span class="pl-actions"><button class="mini-btn" data-play="' + escapeHtml(it.movieId) + '">Play</button>' +
-          '<button class="mini-btn" data-del="' + it.id + '">✕</button></span></div>'
+          '<div class="playlist-item"><span>' + escapeHtml(it.title || it.movieId) + '</span>' +
+          '<span><button data-play="' + escapeHtml(it.movieId) + '">Play</button> ' +
+          '<button data-del="' + it.id + '">✕</button></span></div>'
         ).join('');
       }
 
       playlistEl.addEventListener('click', (e) => {
         const t = e.target;
         if (t.dataset && t.dataset.play) {
-          localMode = false;
-          updateNoVideoHint();
           clientSeq++;
           socket.emit('change-video', { videoId: t.dataset.play, clientSeq, baseVersion, userId: socket.id });
         } else if (t.dataset && t.dataset.del) {
@@ -1588,81 +556,18 @@
         }
       });
 
-      // Drag to reorder (server applies via reorder-playlist)
-      let dragId = null;
-      playlistEl.addEventListener('dragstart', (e) => {
-        const card = e.target.closest ? e.target.closest('.playlist-item') : null;
-        if (!card) return;
-        dragId = card.dataset.id;
-        card.classList.add('dragging');
-        try { e.dataTransfer.effectAllowed = 'move'; } catch (err) {}
-      });
-      playlistEl.addEventListener('dragend', () => {
-        playlistEl.querySelectorAll('.dragging').forEach((c) => c.classList.remove('dragging'));
-        dragId = null;
-      });
-      playlistEl.addEventListener('dragover', (e) => { e.preventDefault(); });
-      playlistEl.addEventListener('drop', (e) => {
-        e.preventDefault();
-        if (!dragId || !joined) return;
-        const order = Array.from(playlistEl.querySelectorAll('.playlist-item')).map((c) => c.dataset.id);
-        // Move the dragged id to the drop position for a natural feel
-        const from = order.indexOf(dragId);
-        if (from < 0) return;
-        order.splice(from, 1);
-        const after = document.elementFromPoint(e.clientX, e.clientY);
-        const card = after && after.closest ? after.closest('.playlist-item') : null;
-        let to = card ? order.indexOf(card.dataset.id) : order.length;
-        if (to < 0) to = order.length;
-        const rect = card ? card.getBoundingClientRect() : null;
-        if (rect && e.clientY > rect.top + rect.height / 2) to++;
-        order.splice(Math.min(to, order.length), 0, dragId);
-        clientSeq++;
-        socket.emit('reorder-playlist', { itemIds: order, clientSeq, baseVersion, userId: socket.id });
-      });
-
-      // ---------- Polls ----------
-      $('createPollBtn').addEventListener('click', () => {
-        if (!joined) return;
-        const q = pollQInput.value.trim();
-        const opts = pollOptsInput.value.split(',').map((s) => s.trim()).filter(Boolean);
-        if (!q || opts.length < 2) { showError('Give the poll a question and at least two options.'); return; }
-        socket.emit('create-poll', { question: q, options: opts });
-        pollQInput.value = ''; pollOptsInput.value = '';
-        closeModals();
-      });
-
       function renderPoll() {
-        if (!activePoll) {
-          pollEl.innerHTML = '<div class="empty">' +
-            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 13v5M12 9v9M17 5v13"/></svg>' +
-            '<div>No active poll.<br />Start one with <strong>+ New poll</strong>.</div></div>';
-          return;
-        }
+        if (!activePoll) { pollEl.innerHTML = '<div class="status">No active poll.</div>'; return; }
         const counts = {};
         Object.values(activePoll.votes || {}).forEach((opt) => { counts[opt] = (counts[opt] || 0) + 1; });
-        const total = Object.keys(activePoll.votes || {}).length;
-        const mine = socket ? activePoll.votes[socket.id] : null;
-        let left = '';
-        if (activePoll.status === 'open' && activePoll.closesAt) {
-          const s = Math.max(0, Math.round((activePoll.closesAt - Date.now()) / 1000));
-          left = '<span class="pill">' + s + 's left</span>';
-        }
-        pollEl.innerHTML = '<div class="poll-card"><div class="q">' + escapeHtml(activePoll.question) + '</div>' +
-          activePoll.options.map((o) => {
-            const c = counts[o.id] || 0;
-            const pct = total ? Math.round((c / total) * 100) : 0;
-            return '<div class="poll-option' + (mine === o.id ? ' voted' : '') + '">' +
-              '<div class="fill" style="width:' + pct + '%"></div>' +
-              '<div class="row"><span>' + escapeHtml(o.text) + '</span><span class="pct">' + pct + '% · ' + c + '</span></div>' +
-              (activePoll.status === 'open' ? '<button data-vote="' + o.id + '" aria-label="Vote ' + escapeHtml(o.text) + '"></button>' : '') +
-              '</div>';
-          }).join('') +
-          '<div class="poll-meta">' +
-          (activePoll.status === 'open'
-            ? '<span class="pill">Open</span>' + left + '<span style="flex:1"></span><button class="mini-btn" id="closePollBtn">End poll</button>'
-            : '<span class="pill">Closed</span>') +
-          '</div></div>';
+        pollEl.innerHTML = '<div class="status">' + escapeHtml(activePoll.question) + '</div>' +
+          activePoll.options.map((o) =>
+            '<div class="poll-option"><span>' + escapeHtml(o.text) + ' (' + (counts[o.id] || 0) + ')</span>' +
+            (activePoll.status === 'open'
+              ? '<button data-vote="' + o.id + '">Vote</button>'
+              : '') + '</div>'
+          ).join('') +
+          (activePoll.status === 'open' ? '<div class="row" style="margin-top:6px"><button id="closePollBtn">Close poll</button></div>' : '<div class="status">Closed</div>');
       }
       renderPoll();
 
@@ -1677,56 +582,105 @@
         }
       });
 
-      // ---------- People / room controls ----------
-      controlToggle.addEventListener('change', () => {
+      function addChat(who, text, mine) {
+        const d = document.createElement('div');
+        d.className = 'chat-message' + (mine ? ' right' : '');
+        const w = document.createElement('span');
+        w.className = 'who'; w.textContent = who;
+        d.appendChild(w);
+        d.appendChild(document.createTextNode(text));
+        chatEl.appendChild(d);
+        chatEl.scrollTop = chatEl.scrollHeight;
+      }
+
+      function showReaction(emoji) {
+        const s = document.createElement('span');
+        s.className = 'reaction-float';
+        s.textContent = emoji;
+        s.style.left = (20 + Math.random() * 60) + '%';
+        s.style.bottom = '120px';
+        videoWrap.appendChild(s);
+        setTimeout(() => s.remove(), 3000);
+      }
+
+      function escapeHtml(s) {
+        return String(s == null ? '' : s)
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      }
+
+      // ---------- Controls ----------
+      // Single toggle path for the button AND clicking the video itself.
+      // Desired state derives from the last server state (not the local flag),
+      // so double-clicks and cross-tab races can't wedge the button.
+      // The UI updates optimistically; if the server rejects the command,
+      // the error handler below reverts to the true room state.
+      function togglePlay() {
         if (!joined || !socket) return;
-        socket.emit('toggle-control', { open: controlToggle.checked, userId: socket.id });
+        const want = storedState.status === 'playing' ? 'paused' : 'playing';
+        isPlaying = want === 'playing';
+        playPauseBtn.textContent = isPlaying ? 'Pause' : 'Play';
+        if (want === 'playing') video.play().catch(() => {});
+        else video.pause();
+        clientSeq++;
+        socket.emit('play-pause', { status: want, clientSeq, baseVersion });
+      }
+      playPauseBtn.addEventListener('click', togglePlay);
+      video.addEventListener('click', togglePlay);
+      seekFwdBtn.addEventListener('click', () => {
+        if (!joined || !isFinite(video.duration)) return;
+        video.currentTime = Math.min(video.currentTime + 10, video.duration || video.currentTime + 10);
+        clientSeq++;
+        socket.emit('seek', { positionMs: Math.round(video.currentTime * 1000), clientSeq, baseVersion });
+      });
+      seekBackBtn.addEventListener('click', () => {
+        if (!joined) return;
+        video.currentTime = Math.max(video.currentTime - 10, 0);
+        clientSeq++;
+        socket.emit('seek', { positionMs: Math.round(video.currentTime * 1000), clientSeq, baseVersion });
       });
 
-      function copyInvite() {
-        if (!myRoomCode) return;
-        const base = location.protocol.startsWith('http') ? location.origin : 'http://localhost:3000';
-        const link = base + '/?code=' + myRoomCode;
-        const done = () => toast('Invite link copied — send it to your friends.');
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(link).then(done, () => { window.prompt('Copy invite link:', link); });
-        } else {
-          window.prompt('Copy invite link:', link);
-        }
+      function sendChat() {
+        const v = chatInput.value.trim();
+        if (!v || !joined) return;
+        clientSeq++;
+        socket.emit('chat-message', { text: v, clientSeq, baseVersion, userId: socket ? socket.id : '' });
+        chatInput.value = '';
       }
-      roomCodeEl.addEventListener('click', copyInvite);
-      roomCodeEl.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); copyInvite(); } });
-      $('copyLinkBtn').addEventListener('click', copyInvite);
+      chatSend.addEventListener('click', sendChat);
+      chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendChat(); });
 
-      function avatarColor(id) {
-        let h = 0;
-        for (let i = 0; i < String(id).length; i++) h = (h * 31 + String(id).charCodeAt(i)) % 360;
-        return 'linear-gradient(135deg, hsl(' + h + ',55%,45%), hsl(' + ((h + 60) % 360) + ',50%,30%))';
-      }
-      participantsEl.addEventListener('click', (e) => {
-        const kb = e.target.closest ? e.target.closest('.kebab-btn') : null;
-        if (kb) {
-          e.stopPropagation();
-          const wrap = kb.closest('.kebab-wrap');
-          const menu = wrap ? wrap.querySelector('.kebab-menu') : null;
-          document.querySelectorAll('.kebab-menu.show').forEach((m) => { if (m !== menu) m.classList.remove('show'); });
-          if (menu) menu.classList.toggle('show');
-          return;
-        }
-        const mk = e.target.closest ? e.target.closest('[data-makehost]') : null;
-        if (mk && joined) {
-          socket.emit('transfer-host', { userId: mk.dataset.makehost });
-          document.querySelectorAll('.kebab-menu.show').forEach((m) => m.classList.remove('show'));
-          return;
-        }
-        const rm = e.target.closest ? e.target.closest('[data-remove]') : null;
-        if (rm && joined) {
-          socket.emit('remove-participant', { userId: rm.dataset.remove });
-          document.querySelectorAll('.kebab-menu.show').forEach((m) => m.classList.remove('show'));
-        }
+      emojiRow.addEventListener('click', (e) => {
+        const t = e.target.closest ? e.target.closest('.emoji-btn') : null;
+        if (!t || !joined) return;
+        clientSeq++;
+        socket.emit('reaction', { emoji: t.dataset.emoji, clientSeq, baseVersion, userId: socket.id });
+        showReaction(t.dataset.emoji);
       });
 
-      // ---------- Source modal wiring ----------
+      $('addVideoBtn').addEventListener('click', () => {
+        if (!joined) return;
+        const title = videoTitleInput.value.trim() || videoUrlInput.value.trim();
+        const movieId = videoUrlInput.value.trim();
+        if (!movieId) return;
+        if (isUnstreamableLink(movieId)) {
+          showError('That looks like a watch-page link (YouTube etc.) — those cannot stream. Paste a direct MP4/WebM URL.');
+          return;
+        }
+        clientSeq++;
+        socket.emit('add-video', { movieId, title, clientSeq, baseVersion, userId: socket.id });
+        videoTitleInput.value = ''; videoUrlInput.value = '';
+      });
+
+      $('createPollBtn').addEventListener('click', () => {
+        if (!joined) return;
+        const q = pollQInput.value.trim();
+        const opts = pollOptsInput.value.split(',').map((s) => s.trim()).filter(Boolean);
+        if (!q || opts.length < 2) return;
+        socket.emit('create-poll', { question: q, options: opts });
+        pollQInput.value = ''; pollOptsInput.value = '';
+      });
+
       $('setVideoBtn').addEventListener('click', () => {
         if (!joined) return;
         const v = setVideoInput.value.trim();
@@ -1739,39 +693,56 @@
         updateNoVideoHint();
         clientSeq++;
         socket.emit('change-video', { videoId: v, clientSeq, baseVersion, userId: socket.id });
-        setVideoInput.value = '';
-        closeModals();
       });
 
       document.querySelectorAll('.sample-btn').forEach((btn) => {
         btn.addEventListener('click', () => {
           const url = SAMPLES[btn.dataset.sample];
           if (!url) return;
-          if (!joined) {
-            try { video.src = url; video.play().catch(() => {}); } catch (e) {}
+          if (!joined) { // not in a room yet: preview locally
+            video.src = url;
+            video.play().catch(() => {});
             updateNoVideoHint();
-            closeModals();
             return;
           }
+          // Share with the whole room (host-only on the server)
           localMode = false;
           updateNoVideoHint();
           clientSeq++;
           socket.emit('change-video', { videoId: url, clientSeq, baseVersion, userId: socket.id });
-          closeModals();
         });
       });
 
-      function pickLocalFile(file) {
-        if (!file) return;
-        localMode = true;
-        try { video.src = URL.createObjectURL(file); } catch (err) { showError('Could not open that file.'); return; }
+      $('fileInput').addEventListener('change', (e) => {
+        const f = e.target.files && e.target.files[0];
+        if (!f) return;
+        localMode = true; // keep shared state from overwriting our file
+        try { video.src = URL.createObjectURL(f); } catch (err) { showError('Could not open that file.'); return; }
         video.play().catch(() => {});
         updateNoVideoHint();
-        closeModals();
-        addChat('System', 'Local file mode: "' + file.name + '". Everyone must open the same file; play/pause/seek stay in sync.', false);
-      }
-      $('fileInput').addEventListener('change', (e) => pickLocalFile(e.target.files && e.target.files[0]));
-      $('fileInputModal').addEventListener('change', (e) => pickLocalFile(e.target.files && e.target.files[0]));
+        addChat('System', 'Local file mode: "' + f.name + '". Everyone must open the same file; play/pause/seek stay in sync.', false);
+      });
+
+      controlToggle.addEventListener('change', () => {
+        if (!joined || !socket) return;
+        // Only the host's toggle is enabled; server enforces this too.
+        socket.emit('toggle-control', { open: controlToggle.checked, userId: socket.id });
+      });
+
+      roomCodeEl.addEventListener('click', () => {
+        if (!myRoomCode) return;
+        const base = location.protocol.startsWith('http') ? location.origin : 'http://localhost:3000';
+        const link = base + '/?code=' + myRoomCode;
+        const done = () => {
+          roomCodeEl.style.background = '#1d4ed8';
+          setTimeout(() => { roomCodeEl.style.background = ''; }, 800);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(link).then(done, () => { window.prompt('Copy invite link:', link); });
+        } else {
+          window.prompt('Copy invite link:', link);
+        }
+      });
 
       // ---------- Join ----------
       function doJoin(code) {
@@ -1785,16 +756,11 @@
         if (!codeInput.value.trim()) { joinError.textContent = 'Enter a room code, or Create room.'; return; }
         doJoin(codeInput.value);
       });
+      // prefill code from ?code= links
       try {
         const q = new URLSearchParams(location.search).get('code');
         if (q) codeInput.value = q.toUpperCase();
       } catch (e) {}
-
-      function escapeHtml(s) {
-        return String(s == null ? '' : s)
-          .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-      }
 
       // ---------- Boot ----------
       (async function boot() {
