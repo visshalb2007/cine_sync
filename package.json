@@ -1,0 +1,40 @@
+{
+  "name": "cine_sync",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/visshalb2007/cine_sync.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/visshalb2007/cine_sync/issues"
+  },
+  "homepage": "https://github.com/visshalb2007/cine_sync#readme",
+  "dependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.5",
+    "concurrently": "^10.0.6",
+    "express": "^5.3.0",
+    "socket.io": "^4.8.4",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^7.0.2"
+  },
+  "devDependencies": {
+    "@babel/core": "^8.0.7",
+    "@babel/preset-react": "^8.0.1",
+    "@babel/preset-typescript": "^8.0.7",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "babel": "^5.8.38",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  }
+}

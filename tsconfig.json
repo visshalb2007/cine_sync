@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "./dist/",
+    "module": "commonjs",
+    "target": "es2020"
+  },
+  "include": ["server/**/*", "client/**/*"]
+}

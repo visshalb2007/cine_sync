@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CineSync - Watch Party</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: system-ui, -apple-system, sans-serif;
+        background: #111;
+        color: #fff;
+        min-height: 100vh;
+      }
+      #root {
+        height: 100%;
+      }
+      .app {
+        display: flex;
+        height: 100%;
+      }
+      .sidebar {
+        width: 260px;
+        background: #222;
+        padding: 20px;
+        overflow-y: auto;
+      }
+      .sidebar h2 {
+        margin-bottom: 20px;
+        font-size: 18px;
+        border-bottom: 1px solid #444;
+        padding-bottom: 10px;
+      }
+      .room-code {
+        background: #333;
+        padding: 8px 12px;
+        margin: 10px 0;
+        font-family: monospace;
+        font-size: 14px;
+        word-break: break-all;
+        color: #0f0;
+      }
+      .participant {
+        display: flex;
+        align-items: center;
+        margin: 8px 0;
+        font-size: 14px;
+      }
+      .participant dot {
+        width: 8px;
+        height: 8px;
+        background: #f00;
+        border-radius: 50%;
+        margin-right: 8px;
+        animation: pulse 1s infinite;
+      }
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+      }
+      .participant.offline dot {
+        background: #666;
+        animation: none;
+      }
+      .main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+      }
+      video {
+        width: 100%;
+        height: 100%;
+        background: #000;
+      }
+      .controls {
+        position: absolute;
+        bottom: 20px;
+        left: 20px;
+        right: 20px;
+        background: rgba(0,0,0,0.5);
+        padding: 12px;
+        border-radius: 8px;
+        color: #fff;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .controls button {
+        background: #fff;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+      }
+      .controls button:hover {
+        background: #f0f0f0;
+      }
+      .controls .rate {
+        background: #333;
+        color: #fff;
+      }
+      .chat {
+        flex: 1;
+        margin-top: 20px;
+        padding: 10px;
+        background: #222;
+        overflow-y: auto;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      .chat-message {
+        margin-bottom: 10px;
+        padding: 8px 12px;
+        background: #333;
+        border-radius: 4px;
+        max-width: 80%;
+      }
+      .chat-message.right {
+        margin-left: auto;
+        background: #444;
+      }
+      .emoji-panel {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        background: #333;
+        padding: 12px;
+        border-radius: 8px;
+        display: flex;
+        gap: 8px;
+        z-index: 100;
+      }
+      .emoji-btn {
+        width: 32px;
+        height: 32px;
+        background: #444;
+        border: none;
+        border-radius: 50%;
+        color: #fff;
+        font-size: 18px;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <div class="app">
+        <div class="sidebar" id="sidebar">
+          <h2>Room</h2>
+          <div class="room-code" id="roomCode">--/--/--</div>
+          <div id="participants"></div>
+        </div>
+        <div class="main">
+          <video id="video" autoplay playsinline></video>
+          <div class="controls">
+            <button id="playPause">Pause</button>
+            <button id="seekForward">+10s</button>
+            <button id="seekBackward">-10s</button>
+            <span class="rate">1x</span>
+          </div>
+          <div class="emoji-panel" id="emojiPanel">
+            <button class="emoji-btn" data-emoji="🔥">🔥</button>
+            <button class="emoji-btn" data-emoji="😂">😂</button>
+            <button class="emoji-btn" data-emoji="😮">😮</button>
+            <button class="emoji-btn" data-emoji="👍">👍</button>
+          </div>
+          <div class="chat" id="chat">
+            <div>Loading chat...</div>
+          </div>
+          <input id="chatInput" type="text" placeholder="Type a message..." style="width: 100%; padding: 8px; margin-top: 10px; border-radius: 4px; border: 1px solid #444; background: #111; color: #fff;" />
+        </div>
+      </div>
+    </div>
+
+    <script type="module">
+      import { io } from 'https://cdn.socket.io/4.7.2/socket.io.esm-browser.min.js';
+
+      const video = document.getElementById('video') as HTMLVideoElement;
+      const playPauseBtn = document.getElementById('playPause') as HTMLButtonElement;
+      const seekForwardBtn = document.getElementById('seekForward') as HTMLButtonElement;
+      const seekBackwardBtn = document.getElementById('seekBackward') as HTMLButtonElement;
+      const rateSpan = document.querySelector('.rate') as HTMLSpanElement;
+      const chat = document.getElementById('chat') as HTMLDivElement;
+      const chatInput = document.getElementById('chatInput') as HTMLInputElement;
+      const emojiPanel = document.getElementById('emojiPanel') as HTMLElement;
+      const sidebar = document.getElementById('sidebar') as HTMLElement;
+      const roomCodeDiv = document.getElementById('roomCode') as HTMLDivElement;
+      const participantsDiv = document.getElementById('participants') as HTMLDivElement;
+
+      let socket: any;
+      let clientSeq = 0;
+      let baseVersion = 0;
+      let isPlaying = false;
+      let userName = '';
+
+      async function init() {
+        // Prompt for name
+        userName = prompt('Enter your name:') || 'Anonymous';
+        if (!userName) userName = 'Anonymous';
+
+        // Create or join room
+        const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+        
+        socket = io();
+
+        socket.emit('join-room', { roomCode, name: userName });
+
+        socket.on('room-snapshot', (data: any) => {
+          // Load video
+          video.src = `/watch/${data.playbackState.videoId}`; // Will be set by movie discovery
+          
+          // Set initial position
+          video.currentTime = data.playbackState.positionMs / 1000;
+          
+          if (data.playbackState.status === 'playing') {
+            video.play();
+          }
+          
+          // Update UI
+          roomCodeDiv.textContent = `Room: ${data.roomCode}`;
+          
+          // Update participants
+          updateParticipants(data.participants);
+        });
+
+        socket.on('participants-update', (data: any) => {
+          updateParticipants(data.participants);
+        });
+
+        socket.on('state-update', (data: any) => {
+          const { playbackState, version } = data;
+          baseVersion = version;
+          
+          // Sync video
+          video.currentTime = playbackState.positionMs / 1000;
+          
+          if (playbackState.status === 'playing' && !isPlaying) {
+            video.play();
+            isPlaying = true;
+            playPauseBtn.textContent = 'Pause';
+          } else if (playbackState.status === 'paused' && isPlaying) {
+            video.pause();
+            isPlaying = false;
+            playPauseBtn.textContent = 'Play';
+          }
+        });
+
+        socket.on('chat-message', (data: any) => {
+          const msgDiv = document.createElement('div');
+          msgDiv.className = `chat-message ${data.userId === socket.id ? 'right' : ''}`;
+          msgDiv.textContent = `${data.name}: ${data.text}`;
+          chat.appendChild(msgDiv);
+          chat.scrollTop = chat.scrollHeight;
+        });
+      }
+
+      function updateParticipants(participants: any[]) {
+        const onlineParticipants = participants.map(p => `
+          <div class="participant ${p.connected ? '' : 'offline'}">
+            <div dot></div>${p.name}
+          </div>
+        `).join('');
+        participantsDiv.innerHTML = onlineParticipants.join('');
+      }
+
+      playPauseBtn.addEventListener('click', () => {
+        isPlaying = !isPlaying;
+        playPauseBtn.textContent = isPlaying ? 'Pause' : 'Play';
+        
+        clientSeq++;
+        socket.emit('play-pause', { 
+          status: isPlaying ? 'playing' : 'paused', 
+          clientSeq,
+          baseVersion 
+        });
+      });
+
+      seekForwardBtn.addEventListener('click', () => {
+        video.currentTime = Math.min(video.currentTime + 10, video.duration);
+        clientSeq++;
+        socket.emit('seek', { 
+          positionMs: Math.round(video.currentTime * 1000), 
+          clientSeq,
+          baseVersion 
+        });
+      });
+
+      seekBackwardBtn.addEventListener('click', () => {
+        video.currentTime = Math.max(video.currentTime - 10, 0);
+        clientSeq++;
+        socket.emit('seek', { 
+          positionMs: Math.round(video.currentTime * 1000), 
+          clientSeq,
+          baseVersion 
+        });
+      });
+
+      chatInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && chatInput.value.trim()) {
+          clientSeq++;
+          socket.emit('chat-message', { 
+            text: chatInput.value.trim(), 
+            clientSeq,
+            baseVersion,
+            userId: socket.id
+          });
+          chatInput.value = '';
+        }
+      });
+
+      // Emoji reactions
+      emojiPanel.addEventListener('click', (e) => {
+        const target = e.target as HTMLElement;
+        if (target.classList.contains('emoji-btn')) {
+          const emoji = target.dataset.emoji;
+          clientSeq++;
+          socket.emit('reaction', { 
+            emoji,
+            clientSeq,
+            baseVersion,
+            userId: socket.id
+          });
+        }
+      });
+      
+      // Chat send on focus out too
+      chatInput.addEventListener('blur', (e) => {
+        if (chatInput.value.trim() && e.relatedTarget !== null) {
+          // Don't send on blur if clicking elsewhere in chat
+          const relatedIsChat = (e.relatedTarget as Node).closest('.chat');
+          if (!relatedIsChat) {
+            if (chatInput.value.trim()) {
+              clientSeq++;
+              socket.emit('chat-message', { 
+                text: chatInput.value.trim(), 
+                clientSeq,
+                baseVersion,
+                userId: socket.id
+              });
+            }
+            chatInput.value = '';
+          }
+        }
+      });
+
+      init();
+    </script>
+  </body>
+</html>
