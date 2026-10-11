@@ -165,8 +165,8 @@
         <div class="row">
           <input id="setVideoInput" type="text" placeholder="Set shared video URL (host)" />
           <button id="setVideoBtn">Set video</button>
-          <button class="sample-btn" data-sample="bbb">Big Buck Bunny</button>
-          <button class="sample-btn" data-sample="elephants">Elephants Dream</button>
+          <button class="sample-btn" data-sample="flower">Flower</button>
+          <button class="sample-btn" data-sample="bbb">Buck Bunny</button>
           <button class="sample-btn" data-sample="sintel">Sintel</button>
           <label class="status" style="cursor:pointer">Open local file
             <input id="fileInput" type="file" accept="video/*" style="display:none" />
@@ -223,10 +223,16 @@
       let activePoll = null;
 
       const SAMPLES = {
-        bbb: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-        elephants: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
-        sintel: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4'
+        flower: '/media/flower.mp4',
+        bbb: '/media/bbb-trailer.mp4',
+        sintel: '/media/sintel-trailer.mp4'
       };
+
+      // YouTube/Vimeo/watch pages are not playable media files — catch early
+      // with a helpful message instead of a cryptic MEDIA_ERR (code 4).
+      function isUnstreamableLink(url) {
+        return /(youtube\.com|youtu\.be|vimeo\.com|dailymotion\.com|netflix\.com|twitch\.tv)/i.test(url || '');
+      }
 
       function setConn(text, cls) {
         connStatus.textContent = text;
@@ -343,7 +349,16 @@
 
       video.addEventListener('error', () => {
         const err = video.error;
-        if (err && video.src) showError('Video failed to load (code ' + err.code + '). Check the URL or try a sample.');
+        if (!err || !video.src) { updateNoVideoHint(); return; }
+        const hints = {
+          1: 'aborted — try pressing Play again.',
+          2: 'network error — the file may be unreachable. Try a sample below.',
+          3: 'decoding error — this file looks corrupt. Try another source.',
+          4: isUnstreamableLink(video.src)
+            ? 'page links (YouTube, Vimeo…) are not playable — paste a direct MP4/WebM file URL instead.'
+            : 'format not supported — use a direct MP4/WebM file URL, a sample, or a local file.'
+        };
+        showError('Video failed to load (code ' + err.code + '): ' + (hints[err.code] || 'unknown error.'));
         updateNoVideoHint();
       });
 
@@ -539,6 +554,10 @@
         const title = videoTitleInput.value.trim() || videoUrlInput.value.trim();
         const movieId = videoUrlInput.value.trim();
         if (!movieId) return;
+        if (isUnstreamableLink(movieId)) {
+          showError('That looks like a watch-page link (YouTube etc.) — those cannot stream. Paste a direct MP4/WebM URL.');
+          return;
+        }
         clientSeq++;
         socket.emit('add-video', { movieId, title, clientSeq, baseVersion, userId: socket.id });
         videoTitleInput.value = ''; videoUrlInput.value = '';
@@ -557,6 +576,10 @@
         if (!joined) return;
         const v = setVideoInput.value.trim();
         if (!v) return;
+        if (isUnstreamableLink(v)) {
+          showError('That looks like a watch-page link (YouTube etc.) — those cannot stream. Paste a direct MP4/WebM URL.');
+          return;
+        }
         clientSeq++;
         socket.emit('change-video', { videoId: v, clientSeq, baseVersion, userId: socket.id });
       });

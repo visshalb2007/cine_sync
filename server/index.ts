@@ -81,23 +81,15 @@ type Room = {
 const rooms = new Map<string, Room>()
 const gracePeriod = 60000 // 60 seconds
 
-// Built-in sample streams so a fresh room has something to watch immediately.
-// Full URLs are stored as videoId; bare ids resolve via /watch/:id below.
+// Built-in sample videos, served same-origin from client/public/media/
+// (fetch with `npm run fetch-media`). Same-origin + local disk means rooms
+// always have something playable: no third-party hosts, no CORS/range issues.
 const SAMPLES: Record<string, { title: string; url: string }> = {
-  bbb: {
-    title: 'Big Buck Bunny (sample)',
-    url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-  },
-  elephants: {
-    title: 'Elephants Dream (sample)',
-    url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
-  },
-  sintel: {
-    title: 'Sintel (sample)',
-    url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
-  },
+  flower: { title: 'Flower (sample)', url: '/media/flower.mp4' },
+  bbb: { title: 'Big Buck Bunny trailer', url: '/media/bbb-trailer.mp4' },
+  sintel: { title: 'Sintel trailer', url: '/media/sintel-trailer.mp4' },
 }
-const DEFAULT_VIDEO = SAMPLES.bbb.url
+const DEFAULT_VIDEO = SAMPLES.flower.url
 
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id)

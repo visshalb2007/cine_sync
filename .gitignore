@@ -2,3 +2,7 @@ node_modules/
 *.local
 dist/
 *.env
+# Sample videos are fetched on demand (npm run fetch-media), not committed
+client/public/media/*.mp4
+server.log
+server-smoke.log
