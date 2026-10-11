@@ -18,6 +18,7 @@ type Participant = {
   name: string
   connected: boolean
   joinedAt: number
+  leftAt?: number
 }
 
 type Room = {
@@ -37,6 +38,7 @@ type Room = {
 }
 
 const rooms = new Map<string, Room>()
+const gracePeriod = 60000 // 60 seconds
 
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id)
@@ -58,7 +60,7 @@ io.on('connection', (socket) => {
   })
 
   // Join room by code
-  socket.on('join-room', ({ roomCode, name }: { roomCode: string; name: string }) => {
+  socket.on('join-room', ({ roomCode, name, sessionToken }: { roomCode: string; name: string; sessionToken?: string }) => {
     let room = rooms.get(roomCode)
     if (!room) {
       // Create new room
@@ -82,6 +84,37 @@ io.on('connection', (socket) => {
       console.log('Created new room:', newCode)
     }
 
+    // Check if this is a reconnection with existing session
+    const existingParticipant = room.participants.find((p) => p.id === socket.id)
+    
+    if (existingParticipant && existingParticipant.leftAt) {
+      // Reconnect within grace period
+      const timeSinceLeft = Date.now() - existingParticipant.leftAt
+      if (timeSinceLeft < gracePeriod) {
+        // Restore participant
+        existingParticipant.connected = true
+        existingParticipant.leftAt = undefined
+        existingParticipant.joinedAt = Date.now() - (existingParticipant.joinedAt - (existingParticipant.leftAt ? existingParticipant.leftAt - existingParticipant.joinedAt : 0))
+        
+        // Broadcast updated participant list
+        io.to(roomCode).emit('participants-update', {
+          participants: room.participants,
+          roomCode,
+        })
+
+        // Send snapshot resume from current version
+        socket.join(roomCode)
+        ;(socket as any).roomCode = roomCode
+        socket.emit('room-snapshot-resume', {
+          playbackState: room.playbackState,
+          version: room.version,
+        })
+        
+        console.log(`Participant ${name} reconnected within grace period`)
+        return
+      }
+    }
+
     // Add participant
     const participant: Participant = {
       id: socket.id,
@@ -98,6 +131,7 @@ io.on('connection', (socket) => {
 
     socket.join(roomCode)
     ;(socket as any).roomCode = roomCode
+    ;(socket as any).sessionToken = socket.id // session token is the socket id
 
     // Broadcast updated participant list
     io.to(roomCode).emit('participants-update', {
@@ -115,6 +149,84 @@ io.on('connection', (socket) => {
     })
 
     console.log(`Participant ${name} joined room ${roomCode}, total: ${room.participants.length}`)
+  })
+
+  // Handle reconnect event
+  socket.on('reconnect-request', ({ sessionToken, lastVersion }: { sessionToken: string; lastVersion: number }) => {
+    const socketId = sessionToken // session token is socket id
+    
+    // Find the room this socket was in
+    let foundRoom = null as Room | null
+    let foundParticipantIndex = -1
+    
+    for (const [, room] of rooms) {
+      const participantIdx = room.participants.findIndex((p) => p.id === socketId)
+      if (participantIdx >= 0) {
+        foundRoom = room
+        foundParticipantIndex = participantIdx
+        break
+      }
+    }
+    
+    if (!foundRoom) {
+      socket.emit('error', { message: 'Room not found' })
+      return
+    }
+    
+    const participant = foundRoom.participants[foundParticipantIndex]
+    
+    // Check if within grace period
+    if (participant.leftAt && Date.now() - participant.leftAt < gracePeriod) {
+      // Restore participant
+      participant.connected = true
+      participant.leftAt = undefined
+      
+      // Broadcast updated participant list
+      io.to(foundRoom.code).emit('participants-update', {
+        participants: foundRoom.participants,
+        code: foundRoom.code,
+      })
+      
+      // Send snapshot resume from current version
+      socket.join(foundRoom.code)
+      ;(socket as any).roomCode = foundRoom.code
+      socket.emit('room-snapshot-resume', {
+        playbackState: foundRoom.playbackState,
+        version: foundRoom.version,
+      })
+      
+      console.log(`Participant ${socketId} reconnected within grace period`)
+    } else {
+      // Grace period expired, treat as new join
+      // Remove old participant and add new one
+      foundRoom.participants = foundRoom.participants.filter((p) => p.id !== socketId)
+      const newParticipant: Participant = {
+        id: socketId,
+        name: participant.name,
+        connected: true,
+        joinedAt: Date.now(),
+      }
+      foundRoom.participants.push(newParticipant)
+      
+      // Broadcast updated participant list
+      io.to(foundRoom.code).emit('participants-update', {
+        participants: foundRoom.participants,
+        code: foundRoom.code,
+      })
+      
+      // Send full snapshot
+      socket.join(foundRoom.code)
+      ;(socket as any).roomCode = foundRoom.code
+      socket.emit('room-snapshot', {
+        playbackState: foundRoom.playbackState,
+        playlist: [],
+        activePoll: null,
+        chatMessages: [],
+        participants: foundRoom.participants,
+      })
+      
+      console.log(`Participant ${socketId} re-joined after grace period expired`)
+    }
   })
 
   // Handle playback commands
@@ -168,15 +280,34 @@ io.on('connection', (socket) => {
     const room = rooms.get(roomCode)
     if (!room) return
 
+    // Mark participant as disconnected
+    const participant = room.participants.find((p) => p.id === socket.id)
+    if (participant) {
+      participant.connected = false
+      participant.leftAt = Date.now()
+    }
+
     room.participants = room.participants.filter((p) => p.id !== socket.id)
     io.to(roomCode).emit('participants-update', {
       participants: room.participants,
       roomCode,
     })
 
-    // If host disconnects, mark for auto-transfer
+    // If host disconnects, mark for auto-transfer after grace period
     if (room.hostId === socket.id) {
       room.hostId = null // Will be transferred after grace period
+      // Start grace period timer for host transfer
+      setTimeout(() => {
+        // Find longest-connected non-host participant
+        const nonHostParticipants = room.participants.filter((p) => p.id !== room.hostId && p.connected).sort((a, b) => b.joinedAt - a.joinedAt)
+        if (nonHostParticipants.length > 0) {
+          room.hostId = nonHostParticipants[0].id
+          io.to(roomCode).emit('host-transfer', {
+            newHostId: room.hostId,
+          })
+          console.log(`Host auto-transferred to ${room.hostId}`)
+        }
+      }, gracePeriod)
     }
 
     console.log(`Client disconnected from room ${roomCode}`)

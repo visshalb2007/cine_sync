@@ -197,6 +197,13 @@
         status: 'paused'
       };
 
+      // Reconnection state
+      let sessionToken = '';
+      let lastKnownVersion = 0;
+      let reconnectAttempts = 0;
+      const maxReconnectAttempts = 5;
+      const baseReconnectDelay = 1000; // 1 second base
+
       async function syncClock() {
         const clientSendTime = Date.now();
         socket.emit('client-hello', { clientTime: clientSendTime });
@@ -213,6 +220,31 @@
             lastSyncAt = Date.now();
           });
         });
+      }
+
+      function calculateReconnectDelay(attempts: number): number {
+        // Exponential backoff with jitter
+        const delay = baseReconnectDelay * 2 ** Math.min(attempts, 5); // cap at 32s
+        const jitter = Math.random() * delay * 0.3; // 30% jitter
+        return Math.floor(delay + jitter);
+      }
+
+      async function attemptReconnect() {
+        reconnectAttempts++;
+        const delay = calculateReconnectDelay(reconnectAttempts);
+        
+        await new Promise(resolve => setTimeout(resolve, delay));
+        
+        // Attempt reconnection
+        if (sessionToken) {
+          socket.emit('reconnect-request', { 
+            sessionToken,
+            lastVersion: lastKnownVersion 
+          });
+        } else {
+          // Fresh reconnect - just rejoin
+          socket.connect();
+        }
       }
 
       async function init() {
@@ -240,7 +272,7 @@
         
         socket = io();
 
-        socket.on('join-room', { roomCode, name: userName });
+        socket.on('join-room', { roomCode, name: userName, sessionToken: sessionToken });
 
         socket.on('room-snapshot', (data: any) => {
           // Load video
@@ -258,11 +290,18 @@
           playbackRate = data.playbackState.rate;
           rateSpan.textContent = playbackRate.toFixed(1) + 'x';
           
+          // Save session token for reconnection
+          sessionToken = data.sessionToken || socket.id;
+          lastKnownVersion = data.version;
+          
           // Update UI
           roomCodeDiv.textContent = 'Room: ' + data.roomCode;
           
           // Update participants
           updateParticipants(data.participants);
+          
+          // Reset reconnection attempts on successful join
+          reconnectAttempts = 0;
         });
 
         socket.on('participants-update', (data: any) => {
@@ -452,6 +491,23 @@
       }, 2000);
 
       init();
+
+      // Handle disconnect - start reconnection process
+      socket.on('disconnect', () => {
+        console.log('Disconnected from server, attempting reconnection...');
+        
+        // Save current state before disconnect
+        const currentPlaybackState = {
+          positionMs: video.currentTime * 1000,
+          status: video.paused ? 'paused' : 'playing',
+          rate: video.playbackRate,
+          serverTimestampMs: Date.now()
+        };
+        lastKnownVersion = baseVersion;
+        
+        // Attempt reconnection after delay
+        attemptReconnect();
+      });
     </script>
   </body>
 </html>
