@@ -41,6 +41,22 @@ const rooms = new Map<string, Room>()
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id)
 
+  // Clock sync: client sends CLIENT_HELLO after connect
+  socket.on('client-hello', ({ clientTime }: { clientTime: number }) => {
+    const serverTime = Date.now()
+    const roundTrip = clientTime - serverTime // client sent time, server receives
+
+    // Store the offset for this connection
+    ;(socket as any).clockOffset = -roundTrip / 2 // serverTime ≈ clientTime + offset
+    ;(socket as any).lastSyncAt = serverTime
+
+    // Send sync ack with server time and computed offset
+    socket.emit('sync-ack', {
+      serverTime,
+      offset: (socket as any).clockOffset,
+    })
+  })
+
   // Join room by code
   socket.on('join-room', ({ roomCode, name }: { roomCode: string; name: string }) => {
     let room = rooms.get(roomCode)
@@ -81,6 +97,7 @@ io.on('connection', (socket) => {
     }
 
     socket.join(roomCode)
+    ;(socket as any).roomCode = roomCode
 
     // Broadcast updated participant list
     io.to(roomCode).emit('participants-update', {
@@ -165,6 +182,11 @@ io.on('connection', (socket) => {
     console.log(`Client disconnected from room ${roomCode}`)
   })
 })
+
+// Periodic clock re-sync every 30 seconds
+setInterval(() => {
+  io.emit('server-time', { serverTime: Date.now() })
+}, 30000)
 
 httpServer.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`)

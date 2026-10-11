@@ -181,7 +181,59 @@
     <script type="module">
       import { io } from 'https://cdn.socket.io/4.7.2/socket.io.esm-browser.min.js';
 
-      const video = document.getElementById('video') as HTMLVideoElement;
+      let clockOffset = 0; // serverTime - clientTime
+      let lastSyncAt = 0;
+
+      async function syncClock() {
+        const clientSendTime = Date.now();
+        socket.emit('client-hello', { clientTime: clientSendTime });
+
+        // Wait for sync-ack (with small timeout)
+        await new Promise<void>((resolve) => {
+          const timeout = setTimeout(() => {
+            resolve();
+          }, 1000);
+          socket.once('sync-ack', (data: any) => {
+            clearTimeout(timeout);
+            const serverTime = data.serverTime;
+            const roundTrip = clientSendTime - serverTime;
+            clockOffset = roundTrip / 2; // serverTime ≈ clientTime + offset, so offset = (serverTime - clientTime)
+            // Actually: roundTrip = clientSendTime - serverTime
+            // offset = (serverTime - clientTime) 
+            // roundTrip = clientTimeAtSend - serverTimeAtReceive
+            // For NTP: offset = (serverReceive - clientSend + serverSend - clientRecv) / 2
+            // Simplified: offset ≈ -roundTrip/2 when server time is close to client time
+            lastSyncAt = Date.now();
+          });
+        });
+      }
+
+      async function init() {
+        // Prompt for name
+        userName = prompt('Enter your name:') || 'Anonymous';
+        if (!userName) userName = 'Anonymous';
+
+        // Initialize clock sync
+        await syncClock();
+
+        // Periodic re-sync every 30 seconds
+        setInterval(() => {
+          const clientSendTime = Date.now();
+          socket.emit('client-hello', { clientTime: clientSendTime });
+          socket.once('sync-ack', (data: any) => {
+            const serverTime = data.serverTime;
+            const roundTrip = clientSendTime - serverTime;
+            clockOffset = roundTrip / 2;
+            lastSyncAt = Date.now();
+          });
+        }, 30000);
+
+        // Join room
+        const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+        
+        socket = io();
+
+        socket.on('join-room', { roomCode, name: userName });
       const playPauseBtn = document.getElementById('playPause') as HTMLButtonElement;
       const seekForwardBtn = document.getElementById('seekForward') as HTMLButtonElement;
       const seekBackwardBtn = document.getElementById('seekBackward') as HTMLButtonElement;
@@ -350,6 +402,14 @@
       });
 
       init();
+
+      // Handle periodic server time updates for clock re-sync
+      socket.on('server-time', (data: any) => {
+        const clientReceiveTime = Date.now();
+        const roundTrip = clientReceiveTime - data.serverTime;
+        clockOffset = roundTrip / 2;
+        lastSyncAt = clientReceiveTime;
+      });
     </script>
   </body>
 </html>
