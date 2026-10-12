@@ -110,7 +110,6 @@ function roomInfo(room: Room) {
 // always have something playable: no third-party hosts, no CORS/range issues.
 const SAMPLES: Record<string, { title: string; url: string }> = {
   flower: { title: 'Flower (sample)', url: '/media/flower.mp4' },
-  bbb: { title: 'Big Buck Bunny trailer', url: '/media/bbb-trailer.mp4' },
   sintel: { title: 'Sintel trailer', url: '/media/sintel-trailer.mp4' },
 }
 const DEFAULT_VIDEO = SAMPLES.flower.url

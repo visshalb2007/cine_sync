@@ -12,7 +12,6 @@ mkdirSync(outDir, { recursive: true });
 
 const FILES = [
   { name: 'flower.mp4', url: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4' },
-  { name: 'bbb-trailer.mp4', url: 'https://media.w3.org/2010/05/bunny/trailer.mp4' },
   { name: 'sintel-trailer.mp4', url: 'https://media.w3.org/2010/05/sintel/trailer.mp4' },
 ];
 
