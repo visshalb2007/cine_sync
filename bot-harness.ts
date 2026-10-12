@@ -44,7 +44,7 @@ interface LatencyStats {
   count: number
 }
 
-export { BotConfig, CommandRecord, LatencyStats }
+export { BotConfig, CommandRecord, LatencyStats, WatchPartyBot }
 
 class WatchPartyBot {
   private socket: any

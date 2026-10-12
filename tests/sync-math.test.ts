@@ -32,7 +32,7 @@ describe('Sync Math: Expected Position Calculation', () => {
   it('calculates expected position at normal rate', () => {
     const positionMs = 60000 // 1 minute
     const serverTimestampMs = 50000
-    const serverNow = 55000 // 50ms later
+    const serverNow = 50050 // 50ms later
     const rate = 1.0
 
     const expected = positionMs + (serverNow - serverTimestampMs) * rate
@@ -42,7 +42,7 @@ describe('Sync Math: Expected Position Calculation', () => {
   it('calculates expected position with fast forward rate', () => {
     const positionMs = 30000
     const serverTimestampMs = 20000
-    const serverNow = 21000 // 1000ms later
+    const serverNow = 20500 // 500ms later at 2x rate = 1000ms added
     const rate = 2.0 // 2x speed
 
     const expected = positionMs + (serverNow - serverTimestampMs) * rate
@@ -94,18 +94,17 @@ describe('Sync Math: Drift Detection Thresholds', () => {
   it('hysteresis: only act if drift stays beyond threshold for 2 consecutive checks', () => {
     // Simulate the hysteresis logic
     let consecutiveBeyondThreshold = 0
-    let lastDriftThreshold = 0
+    const deadZoneThreshold = 100
     
     // First check: drift = 300ms
     const drift1 = 300
-    if (Math.abs(drift1) > lastDriftThreshold) {
+    if (Math.abs(drift1) > deadZoneThreshold) {
       consecutiveBeyondThreshold++
     }
-    lastDriftThreshold = Math.abs(drift1)
     
     // Second check: drift still = 300ms
     const drift2 = 300
-    if (Math.abs(drift2) > lastDriftThreshold) {
+    if (Math.abs(drift2) > deadZoneThreshold) {
       consecutiveBeyondThreshold++
     }
     
@@ -116,12 +115,14 @@ describe('Sync Math: Drift Detection Thresholds', () => {
 
 describe('Sync Math: Latency Statistics', () => {
   it('calculates p50/p95/p99/max from latency samples', () => {
-    const bot = new (require('../bot-harness').WatchPartyBot)({
+    const bot = new WatchPartyBot({
       name: 'TestBot',
       roomCode: 'TEST123',
       numViewers: 1,
       commandsPerViewer: 100,
+      scenario: 'latency',
     })
+    expect(bot).toBeDefined()
     
     // Generate some sample latencies
     const sampleLatencies = [10, 15, 20, 25, 30, 50, 100, 150, 200, 300]
@@ -136,11 +137,11 @@ describe('Sync Math: Latency Statistics', () => {
     const max = sorted[n - 1]
     const mean = sorted.reduce((a, b) => a + b, 0) / n
     
-    expect(p50).toBe(20)
-    expect(p95).toBe(185)
-    expect(p99).toBe(297)
+    expect(p50).toBe(50)
+    expect(p95).toBe(300)
+    expect(p99).toBe(300)
     expect(max).toBe(300)
-    expect(mean).toBe(80)
+    expect(mean).toBe(90)
   })
 
   it('handles edge case of single sample', () => {
@@ -162,47 +163,43 @@ describe('Sync Math: Latency Statistics', () => {
 })
 
 describe('Drift State Machine', () => {
-  let lastDriftThreshold = 0
   let consecutiveDriftBeyondThreshold = 0
 
   beforeEach(() => {
-    lastDriftThreshold = 0
     consecutiveDriftBeyondThreshold = 0
   })
 
   it('applies drift correction after 2 consecutive checks beyond threshold', () => {
-    // Simulate 2 consecutive drift checks beyond threshold
+    // Simulate 2 consecutive drift checks beyond threshold (100ms)
+    const threshold = 100
     
     // Check 1: drift = 300ms
-    if (Math.abs(300) > lastDriftThreshold) {
+    if (Math.abs(300) > threshold) {
       consecutiveDriftBeyondThreshold++
     }
-    lastDriftThreshold = Math.abs(300)
     
     // Check 2: drift = 300ms still
-    if (Math.abs(300) > lastDriftThreshold) {
+    if (Math.abs(300) > threshold) {
       consecutiveDriftBeyondThreshold++
     }
-    lastDriftThreshold = Math.abs(300)
     
     // After 2 consecutive, apply correction
     expect(consecutiveDriftBeyondThreshold).toBe(2)
   })
 
   it('resets hysteresis when drift falls within dead zone', () => {
+    const threshold = 100
     // Check 1: drift = 300ms (beyond threshold)
-    if (Math.abs(300) > lastDriftThreshold) {
+    if (Math.abs(300) > threshold) {
       consecutiveDriftBeyondThreshold++
     }
-    lastDriftThreshold = Math.abs(300)
     
     // Check 2: drift = 50ms (within dead zone - 100ms threshold)
-    if (Math.abs(50) > lastDriftThreshold) {
+    if (Math.abs(50) > threshold) {
       consecutiveDriftBeyondThreshold++
     } else {
       // Drift fell within dead zone, reset hysteresis
       consecutiveDriftBeyondThreshold = 0
-      lastDriftThreshold = 0
     }
     
     expect(consecutiveDriftBeyondThreshold).toBe(0)
