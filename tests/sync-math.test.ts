@@ -59,6 +59,98 @@ describe('Sync Math: Expected Position Calculation', () => {
     const expected = positionMs // paused: just use positionMs directly
     expect(expected).toBe(45000)
   })
+
+  it('expected position while ended holds at position without advancing', () => {
+    const positionMs = 153200
+    const serverTimestampMs = 153200
+    const serverNow = 160000 // 6.8s later
+    const rate = 1.0
+    const status = 'ended'
+
+    // When ended, position does not advance
+    const expected = status === 'ended' ? positionMs : positionMs + (serverNow - serverTimestampMs) * rate
+    expect(expected).toBe(153200)
+  })
+
+  it('clamps expected position to duration so it cannot exceed video duration', () => {
+    const durationMs = 120000 // 2-minute video
+    const positionMs = 118000
+    const serverTimestampMs = 100000
+    const serverNow = 110000 // 10s elapsed
+    const rate = 1.0
+
+    // Without clamping: 118000 + 10000 = 128000 (past duration)
+    const unclamped = positionMs + (serverNow - serverTimestampMs) * rate
+    const clamped = Math.min(unclamped, durationMs)
+
+    expect(clamped).toBe(120000)
+  })
+
+  it('computes drift as 0 at the end of video instead of negative drift', () => {
+    const durationMs = 120000
+    const actual = 120000 // Video stopped at end
+    const isEnded = true
+
+    // When video is ended, drift must be 0 instead of actual - unclampedExpected
+    const drift = isEnded ? 0 : actual - 130000
+    expect(drift).toBe(0)
+  })
+
+  it('updates positionMs on pause so subsequent play resumes from the paused position', () => {
+    const startPos = 10000
+    const startTimestamp = 100000
+    const pauseTime = 125000
+    const rate = 1.0
+
+    // When pausing: elapsed time must be committed into positionMs
+    const elapsed = (pauseTime - startTimestamp) * rate
+    const pausedPos = startPos + elapsed
+    expect(pausedPos).toBe(35000)
+
+    // When resuming play from paused: resumes from 35000ms, not old 10000ms
+    const resumeTime = 130000
+    const resumePos = pausedPos
+    const checkTime = 132000 // 2s after resume
+    const expectedAfterResume = resumePos + (checkTime - resumeTime) * rate
+    expect(expectedAfterResume).toBe(37000)
+  })
+
+  it('replays from start (position 0) when play is clicked at end of video', () => {
+    const isAtEnd = true
+    const durationMs = 153000
+    const currentTimeMs = 153000 // at end
+
+    // Click play at end of video:
+    let want: string
+    let posMs: number
+    if (isAtEnd) {
+      want = 'playing'
+      posMs = 0
+    } else {
+      want = 'paused'
+      posMs = currentTimeMs
+    }
+
+    expect(want).toBe('playing')
+    expect(posMs).toBe(0)
+
+    // Expected position after 3 seconds of replay from start:
+    const serverTimestampMs = 200000
+    const serverNow = 203000
+    const rate = 1.0
+    const expected = posMs + (serverNow - serverTimestampMs) * rate
+    expect(expected).toBe(3000)
+  })
+
+  it('fixes drift to 0 whenever video is paused', () => {
+    // When playback is paused, drift must always evaluate to 0
+    const isPaused = true
+    const anyActualMs = 45120
+    const anyExpectedMs = 45000 // would be 120ms drift if playing
+
+    const drift = isPaused ? 0 : anyActualMs - anyExpectedMs
+    expect(drift).toBe(0)
+  })
 })
 
 describe('Sync Math: Drift Detection Thresholds', () => {

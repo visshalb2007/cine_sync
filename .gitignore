@@ -9,3 +9,6 @@ dist/
 client/public/media/*.mp4
 server.log
 server-smoke.log
+*.db
+*.db-wal
+*.db-shm

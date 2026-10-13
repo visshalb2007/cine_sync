@@ -6,6 +6,21 @@ import fs from 'fs'
 import { loadEnv } from './env'
 import { searchMovies, getMovies, getTmdbGenres } from './api/tmdb'
 import { createIpRateLimiter } from './api/rateLimiter'
+import {
+  createDatabase,
+  saveRoom,
+  loadAllRooms,
+  cleanupExpired,
+  addChatMessage,
+  deleteRoom,
+  type Room,
+  type Participant,
+  type PlaybackState,
+  type PlaylistItem,
+  type Poll,
+  type PollOption,
+  type ChatMessage,
+} from './db'
 
 loadEnv()
 
@@ -172,49 +187,191 @@ const io = new Server(httpServer, {
 
 const PORT = process.env.PORT || 3000
 
-type Participant = {
-  id: string
-  name: string
-  connected: boolean
-  joinedAt: number
-  leftAt?: number
-  reactionHistory?: number[]
-}
-
-type PlaylistItem = {
-  id: string
-  movieId: string
-  title: string
-  addedBy: string
-  order: number
-}
-
-type Room = {
-  id: string
-  code: string
-  hostId: string | null
-  everyoneCanControl: boolean
-  participants: Participant[]
-  playbackState: {
-    videoId: string
-    status: 'playing' | 'paused' | 'ended'
-    positionMs: number
-    serverTimestampMs: number
-    rate: number
-    version: number
-    playlist: PlaylistItem[]
-  }
-  version: number
-}
-
-const rooms = new Map<string, Room>()
+export const db = createDatabase()
+export const rooms = new Map<string, Room>()
+export const dirtyRooms = new Set<string>()
+let saveDebounceTimer: NodeJS.Timeout | null = null
 const gracePeriod = 60000 // 60 seconds
+
+export function markRoomDirty(roomCode: string): void {
+  dirtyRooms.add(roomCode)
+  if (!saveDebounceTimer) {
+    saveDebounceTimer = setTimeout(() => {
+      saveDebounceTimer = null
+      flushDirtyRooms()
+    }, 200)
+  }
+}
+
+export function flushDirtyRooms(): void {
+  if (saveDebounceTimer) {
+    clearTimeout(saveDebounceTimer)
+    saveDebounceTimer = null
+  }
+  if (dirtyRooms.size === 0) return
+
+  const codes = Array.from(dirtyRooms)
+  dirtyRooms.clear()
+  for (const code of codes) {
+    const room = rooms.get(code)
+    if (room) {
+      try {
+        room.updatedAt = Date.now()
+        saveRoom(db, room)
+      } catch (err) {
+        console.error(`Failed to save room ${code}:`, err)
+      }
+    }
+  }
+}
+
+export function flushDirtyRoomsSync(): void {
+  if (saveDebounceTimer) {
+    clearTimeout(saveDebounceTimer)
+    saveDebounceTimer = null
+  }
+  if (dirtyRooms.size === 0) return
+
+  const codes = Array.from(dirtyRooms)
+  dirtyRooms.clear()
+  for (const code of codes) {
+    const room = rooms.get(code)
+    if (room) {
+      try {
+        room.updatedAt = Date.now()
+        saveRoom(db, room)
+      } catch (err) {
+        console.error(`Failed to save room ${code} during sync flush:`, err)
+      }
+    }
+  }
+}
+
+export function runTtlCleanup(): number {
+  const ttlHours = parseFloat(process.env.ROOM_TTL_HOURS || '24') || 24
+  const ttlMs = ttlHours * 60 * 60 * 1000
+  const cutoff = Date.now() - ttlMs
+
+  for (const [code, room] of rooms.entries()) {
+    const updatedAt = room.updatedAt || room.createdAt || 0
+    if (updatedAt < cutoff) {
+      rooms.delete(code)
+      dirtyRooms.delete(code)
+    }
+  }
+
+  return cleanupExpired(db, ttlMs)
+}
+
+export function initRoomsFromDb(): void {
+  try {
+    const loaded = loadAllRooms(db)
+    for (const r of loaded) {
+      rooms.set(r.code, r)
+      // For disconnected participants, schedule grace period to clear offline users
+      r.participants.forEach((p) => {
+        if (!p.connected) {
+          setTimeout(() => {
+            const currentRoom = rooms.get(r.code)
+            if (!currentRoom) return
+            const part = currentRoom.participants.find((item) => item.id === p.id)
+            if (part && !part.connected) {
+              currentRoom.participants = currentRoom.participants.filter((item) => item.id !== p.id)
+              io.to(currentRoom.code).emit('participants-update', roomInfo(currentRoom))
+              markRoomDirty(currentRoom.code)
+            }
+          }, gracePeriod)
+        }
+      })
+
+      // Start reconnect grace period for host transfer if host is disconnected
+      if (r.hostId) {
+        const origHostId = r.hostId
+        setTimeout(() => {
+          const currentRoom = rooms.get(r.code)
+          if (!currentRoom) return
+          const currentHost = currentRoom.participants.find((p) => p.id === origHostId)
+          if (!currentHost || !currentHost.connected) {
+            const nextHost = selectNextHost(currentRoom.participants, origHostId)
+            if (nextHost) {
+              currentRoom.hostId = nextHost.id
+              io.to(currentRoom.code).emit('host-transfer', {
+                newHostId: currentRoom.hostId,
+                previousHostId: origHostId,
+                newHostName: nextHost.name,
+              })
+              io.to(currentRoom.code).emit('participants-update', roomInfo(currentRoom))
+              io.to(currentRoom.code).emit('room-settings', {
+                everyoneCanControl: currentRoom.everyoneCanControl,
+                hostId: currentRoom.hostId,
+              })
+              markRoomDirty(currentRoom.code)
+            }
+          }
+        }, gracePeriod)
+      }
+    }
+    console.log(`Restored ${loaded.length} rooms from database.`)
+  } catch (err) {
+    console.error('Failed to load rooms from database:', err)
+  }
+}
+
+// Restore rooms on boot
+initRoomsFromDb()
+
+// Periodic snapshot every 5s for dirty rooms only
+const snapshotInterval = setInterval(() => {
+  if (dirtyRooms.size > 0) {
+    flushDirtyRooms()
+  }
+}, 5000)
+snapshotInterval.unref()
+
+// Hourly TTL cleanup
+const ttlInterval = setInterval(() => {
+  runTtlCleanup()
+}, 60 * 60 * 1000)
+ttlInterval.unref()
+
+export function handleShutdown(signal: string): void {
+  console.log(`Received ${signal}, flushing dirty rooms and closing database...`)
+  try {
+    flushDirtyRoomsSync()
+    db.close()
+    console.log('Database closed.')
+  } catch (err) {
+    console.error('Error during shutdown:', err)
+  }
+  if (!process.env.VITEST) {
+    process.exit(0)
+  }
+}
+
+if (!process.env.VITEST) {
+  process.on('SIGINT', () => handleShutdown('SIGINT'))
+  process.on('SIGTERM', () => handleShutdown('SIGTERM'))
+}
 
 // Who may issue control commands? Host always; everyone else only when the
 // room's "everyone can control" toggle is on (default true).
+export function isHost(room: Room, socketId: string, userId?: string): boolean {
+  return room.hostId === socketId || (userId != null && room.hostId === userId)
+}
+
+export function selectNextHost(
+  participants: Participant[],
+  excludeHostId?: string | null
+): Participant | null {
+  const eligible = participants
+    .filter((p) => p.id !== excludeHostId && p.connected)
+    .sort((a, b) => a.joinedAt - b.joinedAt || a.id.localeCompare(b.id))
+  return eligible.length > 0 ? eligible[0] : null
+}
+
 function canControl(room: Room, socketId: string, userId?: string): boolean {
   if (room.everyoneCanControl) return true
-  return room.hostId === socketId || (userId != null && room.hostId === userId)
+  return isHost(room, socketId, userId)
 }
 
 // Shared room metadata included in snapshots and participant broadcasts
@@ -269,7 +426,7 @@ io.on('connection', (socket) => {
           ? wantCode
           : Math.random().toString(36).substring(2, 8).toUpperCase()
       room = {
-        id: socket.id,
+        id: `room_${code}_${Date.now()}`,
         code,
         hostId: socket.id,
         everyoneCanControl: true,
@@ -284,29 +441,41 @@ io.on('connection', (socket) => {
           playlist: [],
         },
         version: 0,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
       }
       rooms.set(code, room)
+      saveRoom(db, room)
       console.log('Created new room:', code)
     }
 
     // Check if this is a reconnection with existing session
-    const existingParticipant = room.participants.find((p) => p.id === socket.id)
-    
+    const existingParticipant = room.participants.find(
+      (p) => p.id === socket.id || (sessionToken && p.id === sessionToken) || (!p.connected && p.name === cleanName)
+    )
+
     if (existingParticipant && existingParticipant.leftAt) {
       // Reconnect within grace period
       const timeSinceLeft = Date.now() - existingParticipant.leftAt
       if (timeSinceLeft < gracePeriod) {
         // Restore participant
+        existingParticipant.id = socket.id
         existingParticipant.connected = true
         existingParticipant.leftAt = undefined
         existingParticipant.joinedAt = Date.now() - (existingParticipant.joinedAt - (existingParticipant.leftAt ? existingParticipant.leftAt - existingParticipant.joinedAt : 0))
-        
+
+        if (room.hostId === null || room.hostId === existingParticipant.id) {
+          room.hostId = socket.id
+        }
+        markRoomDirty(room.code)
+
         // Broadcast updated participant list
         io.to(room.code).emit('participants-update', roomInfo(room))
 
         // Send snapshot resume from current version
         socket.join(room.code)
         ;(socket as any).roomCode = room.code
+        ;(socket as any).sessionToken = socket.id
         socket.emit('room-snapshot-resume', {
           ...roomInfo(room),
           playbackState: room.playbackState,
@@ -326,11 +495,12 @@ io.on('connection', (socket) => {
     }
     room.participants.push(participant)
 
-    // Set as host if first participant
-    if (room.participants.length === 1) {
+    // Set as host if first participant or no host
+    if (room.participants.length === 1 || !room.hostId) {
       room.hostId = socket.id
     }
 
+    markRoomDirty(room.code)
     socket.join(room.code)
     ;(socket as any).roomCode = room.code
     ;(socket as any).sessionToken = socket.id // session token is the socket id
@@ -343,8 +513,8 @@ io.on('connection', (socket) => {
       ...roomInfo(room),
       playbackState: room.playbackState,
       playlist: room.playbackState.playlist,
-      activePoll: null,
-      chatMessages: [],
+      activePoll: room.activePoll || null,
+      chatMessages: room.chatMessages || [],
     })
 
     console.log(`Participant ${cleanName} joined room ${room.code}, total: ${room.participants.length}`)
@@ -353,11 +523,11 @@ io.on('connection', (socket) => {
   // Handle reconnect event
   socket.on('reconnect-request', ({ sessionToken, lastVersion }: { sessionToken: string; lastVersion: number }) => {
     const socketId = sessionToken // session token is socket id
-    
+
     // Find the room this socket was in
     let foundRoom: Room | null = null
     let foundParticipantIndex = -1
-    
+
     for (const [, room] of rooms) {
       const participantIdx = room.participants.findIndex((p) => p.id === socketId)
       if (participantIdx >= 0) {
@@ -366,64 +536,73 @@ io.on('connection', (socket) => {
         break
       }
     }
-    
+
     if (!foundRoom) {
       socket.emit('error', { message: 'Room not found' })
       return
     }
-    
+
     const participant = foundRoom.participants[foundParticipantIndex]
-    
+
     // Check if within grace period
     if (participant.leftAt && Date.now() - participant.leftAt < gracePeriod) {
       // Restore participant
+      participant.id = socket.id
       participant.connected = true
       participant.leftAt = undefined
-      
+
+      if (foundRoom.hostId === null || foundRoom.hostId === participant.id) {
+        foundRoom.hostId = socket.id
+      }
+      markRoomDirty(foundRoom.code)
+
       // Broadcast updated participant list
       io.to(foundRoom.code).emit('participants-update', roomInfo(foundRoom))
 
       // Send snapshot resume from current version
       socket.join(foundRoom.code)
       ;(socket as any).roomCode = foundRoom.code
+      ;(socket as any).sessionToken = socket.id
       socket.emit('room-snapshot-resume', {
         ...roomInfo(foundRoom),
         playbackState: foundRoom.playbackState,
       })
-      
+
       console.log(`Participant ${socketId} reconnected within grace period`)
     } else {
       // Grace period expired, treat as new join
       // Remove old participant and add new one
       foundRoom.participants = foundRoom.participants.filter((p) => p.id !== socketId)
       const newParticipant: Participant = {
-        id: socketId,
+        id: socket.id,
         name: participant.name,
         connected: true,
         joinedAt: Date.now(),
       }
       foundRoom.participants.push(newParticipant)
-      
+      markRoomDirty(foundRoom.code)
+
       // Broadcast updated participant list
       io.to(foundRoom.code).emit('participants-update', roomInfo(foundRoom))
 
       // Send full snapshot
       socket.join(foundRoom.code)
       ;(socket as any).roomCode = foundRoom.code
+      ;(socket as any).sessionToken = socket.id
       socket.emit('room-snapshot', {
         ...roomInfo(foundRoom),
         playbackState: foundRoom.playbackState,
         playlist: foundRoom.playbackState.playlist,
-        activePoll: null,
-        chatMessages: [],
+        activePoll: foundRoom.activePoll || null,
+        chatMessages: foundRoom.chatMessages || [],
       })
-      
+
       console.log(`Participant ${socketId} re-joined after grace period expired`)
     }
   })
 
   // Handle playback commands
-  socket.on('play-pause', ({ status, baseVersion, clientSeq }: { status: string; baseVersion: number; clientSeq: number }) => {
+  socket.on('play-pause', ({ status, baseVersion, clientSeq, positionMs }: { status: string; baseVersion: number; clientSeq: number; positionMs?: number }) => {
     const roomCode = (socket as any).roomCode
     if (!roomCode) return
 
@@ -446,9 +625,22 @@ io.on('connection', (socket) => {
       return
     }
 
+    const now = Date.now()
+    if (typeof positionMs === 'number' && isFinite(positionMs) && positionMs >= 0) {
+      room.playbackState.positionMs = positionMs
+    } else if (room.playbackState.status === 'playing') {
+      const elapsed = (now - room.playbackState.serverTimestampMs) * (room.playbackState.rate || 1)
+      room.playbackState.positionMs = Math.max(0, room.playbackState.positionMs + elapsed)
+    }
+
+    if (status === 'playing' && (room.playbackState.status === 'ended' || (typeof positionMs === 'number' && positionMs === 0))) {
+      room.playbackState.positionMs = 0
+    }
+
     room.playbackState.status = status as 'playing' | 'paused' | 'ended'
-    room.playbackState.serverTimestampMs = Date.now()
+    room.playbackState.serverTimestampMs = now
     room.version++
+    markRoomDirty(roomCode)
     io.to(roomCode).emit('state-update', {
       playbackState: room.playbackState,
       version: room.version,
@@ -479,6 +671,7 @@ io.on('connection', (socket) => {
     room.playbackState.positionMs = positionMs
     room.playbackState.serverTimestampMs = Date.now()
     room.version++
+    markRoomDirty(roomCode)
     io.to(roomCode).emit('state-update', {
       playbackState: room.playbackState,
       version: room.version,
@@ -507,6 +700,7 @@ io.on('connection', (socket) => {
     room.playbackState.positionMs = 0
     room.playbackState.serverTimestampMs = Date.now()
     room.version++
+    markRoomDirty(roomCode)
     io.to(roomCode).emit('state-update', {
       playbackState: room.playbackState,
       version: room.version,
@@ -534,12 +728,19 @@ io.on('connection', (socket) => {
       return
     }
 
+    const now = Date.now()
+    if (room.playbackState.status === 'playing') {
+      const elapsed = (now - room.playbackState.serverTimestampMs) * (room.playbackState.rate || 1)
+      room.playbackState.positionMs = Math.max(0, room.playbackState.positionMs + elapsed)
+    }
+
     const validRates = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0]
     const clampedRate = validRates.includes(rate) ? rate : 1.0
 
     room.playbackState.rate = clampedRate
-    room.playbackState.serverTimestampMs = Date.now()
+    room.playbackState.serverTimestampMs = now
     room.version++
+    markRoomDirty(roomCode)
     io.to(roomCode).emit('state-update', {
       playbackState: room.playbackState,
       version: room.version,
@@ -603,12 +804,20 @@ io.on('connection', (socket) => {
     ;(socket as any).chatHistory = recent
 
     const sender = room.participants.find((p) => p.id === socket.id)
-    io.to(roomCode).emit('chat-message', {
+    const chatMsg: ChatMessage = {
       userId: socket.id,
       name: sender ? sender.name : 'Anonymous',
       text: clean,
       serverTimestampMs: now,
-    })
+    }
+    room.chatMessages = room.chatMessages || []
+    room.chatMessages.push(chatMsg)
+    if (room.chatMessages.length > 500) {
+      room.chatMessages = room.chatMessages.slice(-500)
+    }
+    addChatMessage(db, room.id, chatMsg)
+
+    io.to(roomCode).emit('chat-message', chatMsg)
   })
 
   // Handle playlist commands
@@ -647,6 +856,7 @@ io.on('connection', (socket) => {
 
     room.version++
     room.playbackState.playlist = newPlaylist
+    markRoomDirty(roomCode)
   })
 
   socket.on('remove-video', ({ itemId, clientSeq, baseVersion, userId }: { itemId: string; clientSeq: number; baseVersion: number; userId: string }) => {
@@ -676,6 +886,7 @@ io.on('connection', (socket) => {
 
     room.version++
     room.playbackState.playlist = newPlaylist
+    markRoomDirty(roomCode)
   })
 
 socket.on('reorder-playlist', ({ itemIds, clientSeq, baseVersion, userId }: { itemIds: string[]; clientSeq: number; baseVersion: number; userId: string }) => {
@@ -710,12 +921,10 @@ socket.on('reorder-playlist', ({ itemIds, clientSeq, baseVersion, userId }: { it
 
     room.version++
     room.playbackState.playlist = newPlaylist
+    markRoomDirty(roomCode)
   })
 
   // Handle poll commands
-  type PollOption = { id: string; text: string; votes: string[] }
-  type Poll = { id: string; question: string; options: PollOption[]; votes: Record<string, string>; status: 'open' | 'closed'; closesAt?: number; addWinnerToPlaylist?: boolean }
-  
   socket.on('create-poll', ({ question, options, addWinnerToPlaylist }: { question: string; options: string[]; addWinnerToPlaylist?: boolean }) => {
     const roomCode = (socket as any).roomCode
     if (!roomCode) return
@@ -736,10 +945,14 @@ socket.on('reorder-playlist', ({ itemIds, clientSeq, baseVersion, userId }: { it
       status: 'open',
       closesAt: addWinnerToPlaylist ? Date.now() + 60000 : undefined, // close after 1 min if adding to playlist
       addWinnerToPlaylist,
+      createdAt: Date.now(),
     }
 
-    // Store poll in a temporary way - we'll need to persist this
-    // For now, just broadcast the poll creation
+    room.activePoll = poll
+    room.polls = room.polls || []
+    room.polls.push(poll)
+    markRoomDirty(roomCode)
+
     io.to(roomCode).emit('poll-update', {
       poll,
       type: 'create',
@@ -759,8 +972,13 @@ socket.on('reorder-playlist', ({ itemIds, clientSeq, baseVersion, userId }: { it
       return
     }
 
-    // Find and update poll - we need to store polls per room
-    // For now, just acknowledge the vote
+    const poll = (room.polls || []).find((p) => p.id === pollId) || (room.activePoll?.id === pollId ? room.activePoll : null)
+    if (poll) {
+      poll.votes = poll.votes || {}
+      poll.votes[userId] = optionId
+      markRoomDirty(roomCode)
+    }
+
     io.to(roomCode).emit('poll-update', {
       type: 'vote',
       pollId,
@@ -787,6 +1005,15 @@ socket.on('reorder-playlist', ({ itemIds, clientSeq, baseVersion, userId }: { it
       return
     }
 
+    const poll = (room.polls || []).find((p) => p.id === pollId) || (room.activePoll?.id === pollId ? room.activePoll : null)
+    if (poll) {
+      poll.status = 'closed'
+      if (room.activePoll?.id === pollId) {
+        room.activePoll = null
+      }
+      markRoomDirty(roomCode)
+    }
+
     io.to(roomCode).emit('poll-update', {
       type: 'close',
       pollId,
@@ -801,16 +1028,57 @@ socket.on('reorder-playlist', ({ itemIds, clientSeq, baseVersion, userId }: { it
     const room = rooms.get(roomCode)
     if (!room) return
 
-    if (room.hostId !== socket.id && room.hostId !== userId) {
+    if (!isHost(room, socket.id, userId)) {
       socket.emit('error', { message: 'Only the host can change room controls' })
       return
     }
 
     room.everyoneCanControl = open !== false
+    markRoomDirty(roomCode)
     io.to(roomCode).emit('room-settings', {
       everyoneCanControl: room.everyoneCanControl,
       hostId: room.hostId,
     })
+  })
+
+  // Manual host transfer by current host (requires explicit confirmation on client)
+  socket.on('transfer-host', ({ newHostId, userId }: { newHostId: string; userId?: string }) => {
+    const roomCode = (socket as any).roomCode
+    if (!roomCode) return
+
+    const room = rooms.get(roomCode)
+    if (!room) return
+
+    if (!isHost(room, socket.id, userId)) {
+      socket.emit('error', { message: 'Only the host can transfer host controls' })
+      return
+    }
+
+    if (!newHostId || newHostId === room.hostId) {
+      return
+    }
+
+    const targetParticipant = room.participants.find((p) => p.id === newHostId && p.connected)
+    if (!targetParticipant) {
+      socket.emit('error', { message: 'Participant not found or disconnected' })
+      return
+    }
+
+    const previousHostId = room.hostId
+    room.hostId = newHostId
+    markRoomDirty(roomCode)
+
+    io.to(roomCode).emit('host-transfer', {
+      newHostId: room.hostId,
+      previousHostId,
+      newHostName: targetParticipant.name,
+    })
+    io.to(roomCode).emit('participants-update', roomInfo(room))
+    io.to(roomCode).emit('room-settings', {
+      everyoneCanControl: room.everyoneCanControl,
+      hostId: room.hostId,
+    })
+    console.log(`Host transferred from ${previousHostId} to ${room.hostId} (${targetParticipant.name}) in room ${roomCode}`)
   })
 
   socket.on('disconnect', () => {
@@ -827,34 +1095,65 @@ socket.on('reorder-playlist', ({ itemIds, clientSeq, baseVersion, userId }: { it
       participant.leftAt = Date.now()
     }
 
-    room.participants = room.participants.filter((p) => p.id !== socket.id)
-    io.to(roomCode).emit('participants-update', roomInfo(room))
-
-    // If host disconnects, mark for auto-transfer after grace period
+    // If host disconnects, automatically transfer host to the earliest connected participant
     if (room.hostId === socket.id) {
-      room.hostId = null // Will be transferred after grace period
-      // Start grace period timer for host transfer
-      setTimeout(() => {
-        // Find longest-connected non-host participant
-        const nonHostParticipants = room.participants.filter((p) => p.id !== room.hostId && p.connected).sort((a, b) => b.joinedAt - a.joinedAt)
-        if (nonHostParticipants.length > 0) {
-          room.hostId = nonHostParticipants[0].id
-          io.to(roomCode).emit('host-transfer', {
-            newHostId: room.hostId,
-          })
-          console.log(`Host auto-transferred to ${room.hostId}`)
-        }
-      }, gracePeriod)
+      const nextHost = selectNextHost(room.participants, socket.id)
+      if (nextHost) {
+        room.hostId = nextHost.id
+        io.to(roomCode).emit('host-transfer', {
+          newHostId: room.hostId,
+          previousHostId: socket.id,
+          newHostName: nextHost.name,
+        })
+        console.log(`Host disconnected from room ${roomCode}. Auto-transferred to earliest participant ${nextHost.name} (${room.hostId})`)
+      } else {
+        room.hostId = null
+      }
+      io.to(roomCode).emit('room-settings', {
+        everyoneCanControl: room.everyoneCanControl,
+        hostId: room.hostId,
+      })
     }
+
+    io.to(roomCode).emit('participants-update', roomInfo(room))
+    markRoomDirty(roomCode)
+
+    // Schedule cleanup after grace period
+    setTimeout(() => {
+      const p = room.participants.find((item) => item.id === socket.id)
+      if (p && !p.connected) {
+        room.participants = room.participants.filter((item) => item.id !== socket.id)
+        if (room.hostId === socket.id || room.hostId === null) {
+          const nextHost = selectNextHost(room.participants)
+          if (nextHost) {
+            room.hostId = nextHost.id
+            io.to(roomCode).emit('host-transfer', {
+              newHostId: room.hostId,
+              previousHostId: socket.id,
+              newHostName: nextHost.name,
+            })
+            io.to(roomCode).emit('room-settings', {
+              everyoneCanControl: room.everyoneCanControl,
+              hostId: room.hostId,
+            })
+          } else {
+            room.hostId = null
+          }
+        }
+        io.to(roomCode).emit('participants-update', roomInfo(room))
+        markRoomDirty(roomCode)
+      }
+    }, gracePeriod)
 
     console.log(`Client disconnected from room ${roomCode}`)
   })
 })
 
 // Periodic clock re-sync every 30 seconds
-setInterval(() => {
+const serverTimeTimer = setInterval(() => {
   io.emit('server-time', { serverTime: Date.now() })
 }, 30000)
+serverTimeTimer.unref()
 
 if (!process.env.VITEST) {
   httpServer.listen(PORT, () => {

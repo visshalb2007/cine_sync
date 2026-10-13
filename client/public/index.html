@@ -448,6 +448,25 @@
         letter-spacing: 0.04em;
         text-transform: uppercase;
       }
+      .btn-make-host {
+        background: transparent;
+        color: #EA580C;
+        border: 1px solid rgba(234, 88, 12, 0.45);
+        font-size: 11px;
+        font-weight: 600;
+        padding: 2px 7px;
+        border-radius: 999px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        line-height: 1.2;
+        display: inline-flex;
+        align-items: center;
+      }
+      .btn-make-host:hover {
+        background: var(--tag-host-bg);
+        border-color: var(--tag-host-bg);
+        color: var(--tag-host-text);
+      }
 
       /* Playlist & Poll sections in sidebar */
       .sidebar-panel-view {
@@ -2307,8 +2326,14 @@
       function serverNow() { return Date.now() + clockOffset; }
 
       function expectedPosition() {
-        if (!storedState || storedState.status === 'paused') return storedState ? storedState.positionMs : 0;
-        return storedState.positionMs + (serverNow() - storedState.serverTimestampMs) * storedState.rate;
+        if (!storedState || storedState.status === 'paused' || storedState.status === 'ended') {
+          return storedState ? storedState.positionMs : 0;
+        }
+        let pos = storedState.positionMs + (serverNow() - storedState.serverTimestampMs) * storedState.rate;
+        if (isFinite(video.duration) && video.duration > 0) {
+          pos = Math.min(pos, video.duration * 1000);
+        }
+        return pos;
       }
 
       function wireSocket(ioFn) {
@@ -2410,7 +2435,10 @@
           if (data && data.newHostId) myHostId = data.newHostId;
           renderControlNote();
           renderParticipants(lastParticipants);
-          addChat('System', 'Host transferred.', false, true);
+          const newName = (data && data.newHostName) ||
+            ((lastParticipants.find((p) => p.id === (data && data.newHostId)) || {}).name) ||
+            'New host';
+          addChat('System', 'Host controls transferred to ' + newName + '.', false, true);
         });
 
         socket.on('error', (data) => {
@@ -2479,11 +2507,19 @@
         updateSpeedDropdownActive(playbackRate);
         loadVideoSource(ps.videoId);
         updateNoVideoHint();
-        const expected = ps.status === 'paused'
+        const expected = (ps.status === 'paused' || ps.status === 'ended')
           ? ps.positionMs
           : ps.positionMs + (serverNow() - ps.serverTimestampMs) * playbackRate;
 
-        if (hard || video.seeking || video.readyState < 3) {
+        if (ps.status === 'paused' || ps.status === 'ended') {
+          try { video.currentTime = Math.max(0, expected / 1000); } catch (e) {}
+          if (driftLabel) {
+            driftLabel.textContent = 'drift: 0ms';
+            driftLabel.className = 'status status-drift ok';
+          }
+          consecutiveBeyond = 0;
+          lastDriftAbs = 0;
+        } else if (hard || video.seeking || video.readyState < 3) {
           if (hard) { try { video.currentTime = Math.max(0, expected / 1000); } catch (e) {} }
         } else if (Math.abs(video.currentTime * 1000 - expected) > 120 || !isFinite(video.currentTime)) {
           try { video.currentTime = Math.max(0, expected / 1000); } catch (e) {}
@@ -2525,6 +2561,33 @@
       // Drift detection & correction (every 2s)
       setInterval(() => {
         if (!joined || !video.src) return;
+
+        // If video reached the end, drift must be 0
+        const isEnded = video.ended ||
+          (storedState && storedState.status === 'ended') ||
+          (isFinite(video.duration) && video.duration > 0 && video.currentTime >= video.duration - 0.2);
+
+        if (isEnded) {
+          if (driftLabel) {
+            driftLabel.textContent = 'drift: 0ms';
+            driftLabel.className = 'status status-drift ok';
+          }
+          consecutiveBeyond = 0;
+          lastDriftAbs = 0;
+          return;
+        }
+
+        // When paused, drift must be 0
+        if (storedState.status === 'paused' || video.paused) {
+          if (driftLabel) {
+            driftLabel.textContent = 'drift: 0ms';
+            driftLabel.className = 'status status-drift ok';
+          }
+          consecutiveBeyond = 0;
+          lastDriftAbs = 0;
+          return;
+        }
+
         const expected = expectedPosition();
         const actual = (isFinite(video.currentTime) ? video.currentTime : 0) * 1000;
         const drift = actual - expected;
@@ -2534,7 +2597,7 @@
           driftLabel.className = 'status status-drift' + (abs < 100 ? ' ok' : abs <= 500 ? ' warn' : ' err');
         }
 
-        if (storedState.status === 'paused' || video.paused || video.seeking || video.readyState < 3) {
+        if (video.seeking || video.readyState < 3) {
           if (abs < 100) { consecutiveBeyond = 0; lastDriftAbs = 0; }
           return;
         }
@@ -2562,6 +2625,34 @@
           if (rateLabelText) rateLabelText.textContent = formatSpeed(playbackRate);
         }
       }, 2000);
+
+      video.addEventListener('pause', () => {
+        if (driftLabel) {
+          driftLabel.textContent = 'drift: 0ms';
+          driftLabel.className = 'status status-drift ok';
+        }
+        consecutiveBeyond = 0;
+        lastDriftAbs = 0;
+      });
+
+      video.addEventListener('ended', () => {
+        if (driftLabel) {
+          driftLabel.textContent = 'drift: 0ms';
+          driftLabel.className = 'status status-drift ok';
+        }
+        consecutiveBeyond = 0;
+        lastDriftAbs = 0;
+        isPlaying = false;
+        updatePlayButtonUI(false);
+        if (joined && socket && (myEveryoneCanControl || isHost())) {
+          clientSeq++;
+          socket.emit('play-pause', {
+            status: 'ended',
+            clientSeq,
+            baseVersion,
+          });
+        }
+      });
 
       video.addEventListener('waiting', () => {
         if (driftLabel) {
@@ -2728,18 +2819,41 @@
         }
 
         if (participantsEl) {
-          participantsEl.innerHTML = lastParticipants.map((p) =>
-            '<div class="participant-row' + (p.connected === false ? ' offline' : '') + '">' +
-            '<span class="participant-dot"></span>' +
-            '<span class="participant-name">' + escapeHtml(p.name) + '</span>' +
-            '<div class="participant-badges">' +
-            (p.id === me ? '<span class="badge badge-you">YOU</span>' : '') +
-            (p.id === myHostId ? '<span class="badge badge-host">HOST</span>' : '') +
-            '</div>' +
-            '</div>'
-          ).join('');
+          participantsEl.innerHTML = lastParticipants.map((p) => {
+            const isMe = p.id === me;
+            const isTargetHost = p.id === myHostId;
+            const canTransfer = isHost() && !isTargetHost && p.connected !== false;
+            return (
+              '<div class="participant-row' + (p.connected === false ? ' offline' : '') + '">' +
+              '<span class="participant-dot"></span>' +
+              '<span class="participant-name">' + escapeHtml(p.name) + '</span>' +
+              '<div class="participant-badges">' +
+              (isMe ? '<span class="badge badge-you">YOU</span>' : '') +
+              (isTargetHost ? '<span class="badge badge-host">HOST</span>' : '') +
+              (canTransfer
+                ? '<button type="button" class="btn-make-host" data-user-id="' + escapeHtml(p.id) + '" data-user-name="' + escapeHtml(p.name) + '" title="Transfer host role to ' + escapeHtml(p.name) + '">Make Host</button>'
+                : '') +
+              '</div>' +
+              '</div>'
+            );
+          }).join('');
         }
         renderControlNote();
+      }
+
+      if (participantsEl) {
+        participantsEl.addEventListener('click', (e) => {
+          const btn = e.target.closest('.btn-make-host');
+          if (!btn) return;
+          const targetId = btn.dataset.userId;
+          const targetName = btn.dataset.userName || 'this participant';
+          if (!isHost()) return;
+          const confirmed = window.confirm(
+            'Transfer host controls to "' + targetName + '"?\n\nYou will no longer be the host. Only one host can exist at a time.'
+          );
+          if (!confirmed) return;
+          socket.emit('transfer-host', { newHostId: targetId, userId: socket.id });
+        });
       }
 
       function renderPlaylist(list) {
@@ -2920,13 +3034,43 @@
       // Play / Pause Toggle
       function togglePlay() {
         if (!joined || !socket) return;
-        const want = storedState.status === 'playing' ? 'paused' : 'playing';
+
+        const isAtEnd = video.ended ||
+          (storedState && storedState.status === 'ended') ||
+          (isFinite(video.duration) && video.duration > 0 && video.currentTime >= video.duration - 0.5);
+
+        let want;
+        let posMs;
+
+        if (isAtEnd) {
+          // If play is clicked at end of video, replay from start
+          want = 'playing';
+          posMs = 0;
+          try { video.currentTime = 0; } catch (e) {}
+        } else {
+          want = storedState.status === 'playing' ? 'paused' : 'playing';
+          posMs = isFinite(video.currentTime) && video.currentTime >= 0
+            ? Math.round(video.currentTime * 1000)
+            : (storedState ? storedState.positionMs : 0);
+        }
+
         isPlaying = want === 'playing';
         updatePlayButtonUI(isPlaying);
-        if (want === 'playing') video.play().catch(() => {});
-        else video.pause();
+
+        if (want === 'playing') {
+          video.play().catch(() => {});
+        } else {
+          video.pause();
+          if (driftLabel) {
+            driftLabel.textContent = 'drift: 0ms';
+            driftLabel.className = 'status status-drift ok';
+          }
+          consecutiveBeyond = 0;
+          lastDriftAbs = 0;
+        }
+
         clientSeq++;
-        socket.emit('play-pause', { status: want, clientSeq, baseVersion });
+        socket.emit('play-pause', { status: want, positionMs: posMs, clientSeq, baseVersion });
       }
       if (playPauseBtn) playPauseBtn.addEventListener('click', togglePlay);
       video.addEventListener('click', togglePlay);
