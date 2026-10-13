@@ -4,7 +4,9 @@
 [![Node.js](https://img.shields.io/badge/Node.js-v20+-green.svg)](https://nodejs.org/)
 [![Socket.IO](https://img.shields.io/badge/Socket.IO-v4.8-black.svg)](https://socket.io/)
 [![SQLite](https://img.shields.io/badge/SQLite-WAL--Mode-003B57.svg)](https://www.sqlite.org/)
-[![Tests](https://img.shields.io/badge/Tests-59%20Passing-brightgreen.svg)]()
+[![Unit Tests](https://img.shields.io/badge/Unit%20Tests-59%20Passing-brightgreen.svg)]()
+[![Playwright](https://img.shields.io/badge/Playwright-6%20E2E%20Specs%20Passing-brightgreen.svg)](https://playwright.dev/)
+[![CI](https://github.com/visshalb2007/cine_sync/actions/workflows/test.yml/badge.svg)](https://github.com/visshalb2007/cine_sync/actions/workflows/test.yml)
 
 CineSync is a synchronized watch-party platform with server-authoritative playback, low-latency WebSocket synchronization, movie discovery, SQLite persistence, and multi-viewer host management.
 
@@ -34,8 +36,9 @@ REST Gateway ⇄ Movie Discovery (/api/search, /api/genres, /api/movies)
 - **NTP-Style Clock Synchronization**: Offset computation with periodic 30s resynchronization heartbeats.
 - **Dual-Tier Drift Correction**:
   - **Dead zone (< 100 ms)**: No correction needed.
-  - **Soft correction (100–500 ms)**: Seamless stepwise playback rate adjustment (`0.95x` / `1.05x`).
+  - **Soft correction (100–500 ms)**: Stepwise playback rate adjustment (`0.95x` / `1.05x`).
   - **Hard seek (> 500 ms)**: Two consecutive checks trigger a hard seek to authoritative position.
+- **Boundary & Pause Stability**: Guaranteed 0 ms drift display when paused or when video reaches the end; clicking Play at the end of a video automatically replays from 0:00.
 
 ### 2. Host Management & Transfer Invariants
 - **Earliest Participant Rule on Disconnect**: When the host leaves/disconnects, host controls automatically and immediately transfer to the earliest connected participant (smallest `joinedAt` timestamp).
@@ -47,7 +50,7 @@ REST Gateway ⇄ Movie Discovery (/api/search, /api/genres, /api/movies)
 - **Dual-Provider Discovery**: Integrated TMDB and OMDb APIs with normalized data models and automated OMDb fallback.
 - **Caching & Rate Limiting**: 10-minute in-memory LRU/TTL cache and 60 req/min IP-based rate limiting.
 - **Client-Side Discovery UI**: Search input with 300ms debounce, Fuse.js fuzzy re-ranking, genre filtering, year filtering, and responsive poster grid.
-- **One-Click Playlist Integration**: Instant addition to the room's shared playlist via synchronized WebSocket events.
+- **Full Playlist Queue Lifecycle**: One-click add from discovery or direct MP4/WebM URL, interactive reordering via Move Up (`▲`) / Move Down (`▼`) buttons (`reorder-playlist`), direct play-now selection, and deletion.
 
 ### 4. Zero Data-Loss SQLite Persistence
 - **better-sqlite3 with WAL Mode**: Crash-resilient persistence with migration versioning.
@@ -61,6 +64,7 @@ REST Gateway ⇄ Movie Discovery (/api/search, /api/genres, /api/movies)
 - **Live Chat**: Real-time room chat with server timestamps, HTML sanitization, and history capped at the last 500 messages.
 - **Emoji Reactions**: Floating reaction animations with rate limiting (3 reactions per 15s per user).
 - **Interactive Group Polls**: Real-time multi-option voting with optional auto-add of the winning video to the playlist upon closure.
+- **Reconnection Grace Period**: Configurable grace period (`RECONNECT_GRACE_MS`) allowing disconnected participants to resume session state without re-registering.
 
 ---
 
@@ -93,6 +97,7 @@ Create a `.env` file in the root directory:
 PORT=3000
 DB_PATH=./cine_sync.db
 ROOM_TTL_HOURS=24
+RECONNECT_GRACE_MS=60000
 TMDB_API_KEY=your_tmdb_api_key_here
 OMDB_API_KEY=your_omdb_api_key_here
 ```
@@ -123,6 +128,37 @@ Run the Vitest unit test suite (59 passing tests across 5 suites):
 ```bash
 npm run test:unit
 ```
+
+### End-to-End (E2E) Tests
+Run the automated Playwright test suite (6 passing specs against an isolated in-memory DB and live server):
+```bash
+# Run all E2E specs
+npm run test:playwright
+
+# Run with interactive UI
+npx playwright test --ui
+
+# View latest HTML test report and traces
+npx playwright show-report
+```
+
+#### E2E Test Suite (`e2e/*.spec.ts`)
+| Spec | Description | Tolerance / Verification |
+|:---|:---|:---|
+| **`room.spec.ts`** | Room creation, invite link join (`/?code=...`), participant list sync | `YOU` & `HOST` badges, real-time count updates |
+| **`sync.spec.ts`** | 3-client synchronization across play, pause, seek from host | `expect.poll` drift convergence ≤ 500 ms |
+| **`late-join.spec.ts`** | Mid-playback joiner synchronization | Lands at authoritative position without restarting |
+| **`host-transfer.spec.ts`** | Host auto-transfer to earliest participant on disconnect | Host badge handover, host-only playback control |
+| **`reconnect.spec.ts`** | Network drop (`context.setOffline`) and grace period handling | Identity preserved within grace; new participant on expiry |
+| **`features.spec.ts`** | Chat, reactions, playlist (add/reorder/play/remove), polls | Bidirectional chat, reaction floats, poll voting/closure |
+
+### Continuous Integration (CI)
+Automated testing is configured via GitHub Actions in [`.github/workflows/test.yml`](.github/workflows/test.yml):
+- Sets up Node.js v20 and caches dependencies
+- Installs Playwright Chromium (`npx playwright install --with-deps chromium`)
+- Executes Vitest unit tests (`npm run test:unit`)
+- Executes Playwright E2E tests (`npm run test:playwright`) with in-memory DB
+- Automatically uploads Playwright HTML reports and failure traces as build artifacts on failure
 
 ### Running Benchmarks
 Run high-resolution multi-viewer benchmarks via CLI:

@@ -1517,17 +1517,17 @@
         <p class="join-modal-desc">Minimalist synchronized watch party</p>
         <div class="join-form-group">
           <label class="join-form-label" for="nameInput">Your Name</label>
-          <input class="join-input" id="nameInput" type="text" maxlength="40" placeholder="Anonymous" autocomplete="off" />
+          <input class="join-input" id="nameInput" data-testid="name-input" type="text" maxlength="40" placeholder="Anonymous" autocomplete="off" />
         </div>
         <div class="join-form-group">
           <label class="join-form-label" for="codeInput">Room Code <span style="color:var(--text-muted);font-weight:400;">(optional)</span></label>
-          <input class="join-input" id="codeInput" type="text" maxlength="8" placeholder="X7PV9P" autocomplete="off" />
+          <input class="join-input" id="codeInput" data-testid="code-input" type="text" maxlength="8" placeholder="X7PV9P" autocomplete="off" />
         </div>
         <div class="join-actions-row">
-          <button id="createBtn" class="join-btn-primary">Create Room</button>
-          <button id="joinBtn" class="join-btn-secondary">Join Room</button>
+          <button id="createBtn" data-testid="create-room-btn" class="join-btn-primary">Create Room</button>
+          <button id="joinBtn" data-testid="join-room-btn" class="join-btn-secondary">Join Room</button>
         </div>
-        <div id="joinError"></div>
+        <div id="joinError" data-testid="join-error"></div>
       </div>
     </div>
 
@@ -1563,7 +1563,7 @@
             <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
             <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
           </svg>
-          <span id="headerParticipantCount">1</span>
+          <span id="headerParticipantCount" data-testid="participant-count">1</span>
         </div>
         <div class="user-avatar" id="headerUserAvatar" title="Your Profile">V</div>
       </div>
@@ -1574,7 +1574,7 @@
       <aside class="sidebar" id="sidebar">
         <!-- Sidebar Navigation -->
         <nav class="sidebar-nav-tabs" aria-label="Sidebar Sections">
-          <button type="button" class="sidebar-nav-item active" id="navTabVideo" data-tab="video">
+          <button type="button" class="sidebar-nav-item active" id="navTabVideo" data-testid="tab-video" data-tab="video">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
               <line x1="7" y1="2" x2="7" y2="22"></line>
@@ -1587,7 +1587,7 @@
             </svg>
             <span>Video</span>
           </button>
-          <button type="button" class="sidebar-nav-item" id="navTabPlaylist" data-tab="playlist">
+          <button type="button" class="sidebar-nav-item" id="navTabPlaylist" data-testid="tab-playlist" data-tab="playlist">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <line x1="8" y1="6" x2="21" y2="6"></line>
               <line x1="8" y1="12" x2="21" y2="12"></line>
@@ -1598,7 +1598,7 @@
             </svg>
             <span>Playlist</span>
           </button>
-          <button type="button" class="sidebar-nav-item" id="navTabPoll" data-tab="poll">
+          <button type="button" class="sidebar-nav-item" id="navTabPoll" data-testid="tab-poll" data-tab="poll">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <line x1="18" y1="20" x2="18" y2="10"></line>
               <line x1="12" y1="20" x2="12" y2="4"></line>
@@ -1606,7 +1606,7 @@
             </svg>
             <span>Poll</span>
           </button>
-          <button type="button" class="sidebar-nav-item" id="navTabSearch" data-tab="search" aria-controls="sidebarViewSearch" role="tab" aria-selected="false">
+          <button type="button" class="sidebar-nav-item" id="navTabSearch" data-testid="tab-search" data-tab="search" aria-controls="sidebarViewSearch" role="tab" aria-selected="false">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="11" cy="11" r="8"></circle>
               <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
@@ -1626,7 +1626,7 @@
               </svg>
             </div>
             <div id="roomSectionContent" style="display: flex; flex-direction: column; gap: 8px;">
-              <div class="room-code-box" id="roomCode" title="Click to copy invite link">
+              <div class="room-code-box" id="roomCode" data-testid="room-code" title="Click to copy invite link">
                 <span class="room-code-text code-value">X7PV9P</span>
                 <button type="button" class="copy-btn" aria-label="Copy room code" title="Copy code">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1638,7 +1638,7 @@
               <div class="status-details">
                 <div class="conn-status-row">
                   <span class="conn-dot" id="connDot"></span>
-                  <span id="connStatus" class="conn-status-text">connected · room X7PV9P</span>
+                  <span id="connStatus" data-testid="conn-status" class="conn-status-text">connected · room X7PV9P</span>
                 </div>
                 <div id="watchCount" class="watch-count-text">1 person watching</div>
               </div>
@@ -1651,10 +1651,10 @@
               <span>Room Controls</span>
             </div>
             <label class="room-controls-row">
-              <input type="checkbox" id="controlToggle" checked />
+              <input type="checkbox" id="controlToggle" data-testid="control-toggle" checked />
               <span class="room-controls-label">Everyone can control</span>
             </label>
-            <div id="controlNote" class="room-controls-helper">You are host · everyone can control</div>
+            <div id="controlNote" data-testid="control-note" class="room-controls-helper">You are host · everyone can control</div>
           </section>
 
           <!-- Participants -->
@@ -1662,13 +1662,13 @@
             <div class="sidebar-section-header">
               <span>Participants</span>
             </div>
-            <div id="participants" class="participants-list">
-              <div class="participant-row">
+            <div id="participants" data-testid="participants-list" class="participants-list">
+              <div class="participant-row" data-testid="participant-row">
                 <span class="participant-dot"></span>
-                <span class="participant-name">Anonymous</span>
+                <span class="participant-name" data-testid="participant-name">Anonymous</span>
                 <div class="participant-badges">
-                  <span class="badge badge-you">YOU</span>
-                  <span class="badge badge-host">HOST</span>
+                  <span class="badge badge-you" data-testid="badge-you">YOU</span>
+                  <span class="badge badge-host" data-testid="badge-host">HOST</span>
                 </div>
               </div>
             </div>
@@ -1681,15 +1681,15 @@
             <div class="sidebar-section-header">
               <span>Playlist Queue</span>
             </div>
-            <div id="playlist">
+            <div id="playlist" data-testid="playlist-list">
               <div class="empty-notice">Empty — add a video below.</div>
             </div>
             <div class="sidebar-input-group">
               <label for="videoTitleInput">Video Title</label>
-              <input type="text" class="sidebar-input" id="videoTitleInput" placeholder="Title" maxlength="100" />
+              <input type="text" class="sidebar-input" id="videoTitleInput" data-testid="playlist-title-input" placeholder="Title" maxlength="100" />
               <label for="videoUrlInput">Direct MP4/WebM URL</label>
-              <input type="text" class="sidebar-input" id="videoUrlInput" placeholder="https://.../video.mp4" />
-              <button type="button" id="addVideoBtn" class="sidebar-btn" disabled>Add to Playlist</button>
+              <input type="text" class="sidebar-input" id="videoUrlInput" data-testid="playlist-url-input" placeholder="https://.../video.mp4" />
+              <button type="button" id="addVideoBtn" data-testid="playlist-add-btn" class="sidebar-btn" disabled>Add to Playlist</button>
             </div>
           </section>
         </div>
@@ -1700,15 +1700,15 @@
             <div class="sidebar-section-header">
               <span>Active Poll</span>
             </div>
-            <div id="poll">
+            <div id="poll" data-testid="poll-container">
               <div class="empty-notice">No active poll.</div>
             </div>
             <div class="sidebar-input-group">
               <label for="pollQInput">Poll Question</label>
-              <input type="text" class="sidebar-input" id="pollQInput" placeholder="What should we watch next?" maxlength="200" />
+              <input type="text" class="sidebar-input" id="pollQInput" data-testid="poll-q-input" placeholder="What should we watch next?" maxlength="200" />
               <label for="pollOptsInput">Options (comma separated)</label>
-              <input type="text" class="sidebar-input" id="pollOptsInput" placeholder="Option 1, Option 2" />
-              <button type="button" id="createPollBtn" class="sidebar-btn" disabled>Start Poll</button>
+              <input type="text" class="sidebar-input" id="pollOptsInput" data-testid="poll-opts-input" placeholder="Option 1, Option 2" />
+              <button type="button" id="createPollBtn" data-testid="poll-create-btn" class="sidebar-btn" disabled>Start Poll</button>
             </div>
           </section>
         </div>
@@ -1754,7 +1754,7 @@
         <!-- Cinematic Video Player Card -->
         <div class="player-card" id="playerCard">
           <div class="video-wrapper" id="videoWrap">
-            <video id="video" playsinline preload="metadata"></video>
+            <video id="video" data-testid="video-element" playsinline preload="metadata"></video>
             <div class="video-corner-controls">
               <button id="pipBtn" class="corner-btn" title="Picture in Picture" aria-label="Picture in Picture">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1776,20 +1776,20 @@
           <div class="player-controls-area">
             <!-- Timeline Row -->
             <div class="timeline-row">
-              <span id="currTime" class="time-label current">0:00</span>
+              <span id="currTime" data-testid="current-time" class="time-label current">0:00</span>
               <div class="timeline-slider-wrap" id="timelineSliderWrap">
                 <div class="timeline-track">
                   <div class="timeline-filled" id="progressFill"></div>
                 </div>
-                <input type="range" class="timeline-range-input" id="progressBar" min="0" max="100" value="0" step="0.1" aria-label="Timeline seek" />
+                <input type="range" class="timeline-range-input" id="progressBar" data-testid="timeline-slider" min="0" max="100" value="0" step="0.1" aria-label="Timeline seek" />
               </div>
-              <span id="durTime" class="time-label duration">0:00</span>
+              <span id="durTime" data-testid="duration-time" class="time-label duration">0:00</span>
             </div>
 
             <!-- Controls Row -->
             <div class="controls-actions-row">
               <!-- Play / Pause -->
-              <button id="playPause" class="btn-play-pause" title="Play / Pause" aria-label="Play / Pause">
+              <button id="playPause" data-testid="play-pause-btn" class="btn-play-pause" title="Play / Pause" aria-label="Play / Pause">
                 <svg id="playIconSvg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                   <polygon points="5 3 19 12 5 21 5 3"></polygon>
                 </svg>
@@ -1800,7 +1800,7 @@
               </button>
 
               <!-- -10s -->
-              <button id="seekBack" class="btn-skip" title="Rewind 10 seconds" aria-label="Rewind 10 seconds">
+              <button id="seekBack" data-testid="seek-back-btn" class="btn-skip" title="Rewind 10 seconds" aria-label="Rewind 10 seconds">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M11 17l-5-5 5-5M18 17l-5-5 5-5"></path>
                 </svg>
@@ -1808,7 +1808,7 @@
               </button>
 
               <!-- +10s -->
-              <button id="seekFwd" class="btn-skip" title="Forward 10 seconds" aria-label="Forward 10 seconds">
+              <button id="seekFwd" data-testid="seek-fwd-btn" class="btn-skip" title="Forward 10 seconds" aria-label="Forward 10 seconds">
                 <span>+10s</span>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M13 17l5-5-5-5M6 17l5-5-5-5"></path>
@@ -1838,7 +1838,7 @@
 
               <!-- Sync & Drift Stats -->
               <div class="sync-status-group">
-                <span class="status status-drift ok" id="driftLabel">drift: 0ms</span>
+                <span class="status status-drift ok" id="driftLabel" data-testid="drift-label">drift: 0ms</span>
                 <span class="status status-sync" id="clockLabel">sync: 1ms</span>
                 <span class="status status-mode" id="modeLabel"></span>
               </div>
@@ -1874,9 +1874,9 @@
                 <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
                 <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
               </svg>
-              <input id="setVideoInput" class="url-input" type="text" placeholder="Set shared direct MP4/WebM URL — not YouTube (host)" />
+              <input id="setVideoInput" data-testid="set-video-input" class="url-input" type="text" placeholder="Set shared direct MP4/WebM URL — not YouTube (host)" />
             </div>
-            <button id="setVideoBtn" class="btn-set-video">Set video</button>
+            <button id="setVideoBtn" data-testid="set-video-btn" class="btn-set-video">Set video</button>
             <button class="btn-preset sample-btn" data-sample="flower">Flower</button>
             <button class="btn-preset sample-btn" data-sample="sintel">Sintel</button>
             <label class="btn-local-file" id="openLocalBtn">
@@ -1890,18 +1890,18 @@
         </section>
 
         <!-- Emoji Reactions Row -->
-        <section class="reactions-row" id="emojiRow">
-          <button class="btn-reaction emoji-btn" data-emoji="🔥" title="React with Fire">🔥</button>
-          <button class="btn-reaction emoji-btn" data-emoji="😂" title="React with Laugh">😂</button>
-          <button class="btn-reaction emoji-btn" data-emoji="😍" title="React with Love">😍</button>
-          <button class="btn-reaction emoji-btn" data-emoji="👍" title="React with Thumbs Up">👍</button>
-          <button class="btn-reaction emoji-btn" data-emoji="❤️" title="React with Heart">❤️</button>
+        <section class="reactions-row" id="emojiRow" data-testid="emoji-row">
+          <button class="btn-reaction emoji-btn" data-testid="emoji-btn" data-emoji="🔥" title="React with Fire">🔥</button>
+          <button class="btn-reaction emoji-btn" data-testid="emoji-btn" data-emoji="😂" title="React with Laugh">😂</button>
+          <button class="btn-reaction emoji-btn" data-testid="emoji-btn" data-emoji="😍" title="React with Love">😍</button>
+          <button class="btn-reaction emoji-btn" data-testid="emoji-btn" data-emoji="👍" title="React with Thumbs Up">👍</button>
+          <button class="btn-reaction emoji-btn" data-testid="emoji-btn" data-emoji="❤️" title="React with Heart">❤️</button>
         </section>
 
         <!-- Chat Area -->
         <section class="chat-section">
           <!-- Chat messages stream (only expands when messages exist) -->
-          <div class="chat-messages-container" id="chat">
+          <div class="chat-messages-container" id="chat" data-testid="chat-messages">
             <div class="chat-message-bubble system">Chat messages will appear here</div>
           </div>
 
@@ -1912,8 +1912,8 @@
                 <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
               </svg>
             </button>
-            <input id="chatInput" class="chat-composer-input" type="text" maxlength="500" placeholder="Type a message..." autocomplete="off" />
-            <button id="chatSend" class="btn-send" title="Send message" aria-label="Send">
+            <input id="chatInput" data-testid="chat-input" class="chat-composer-input" type="text" maxlength="500" placeholder="Type a message..." autocomplete="off" />
+            <button id="chatSend" data-testid="chat-send-btn" class="btn-send" title="Send message" aria-label="Send">
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <line x1="22" y1="2" x2="11" y2="13"></line>
                 <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
@@ -2350,6 +2350,15 @@
 
         socket.on('disconnect', () => {
           setConn('reconnecting…', 'amber');
+        });
+
+        window.addEventListener('offline', () => {
+          setConn('reconnecting…', 'amber');
+          try { socket.disconnect(); } catch (e) {}
+        });
+
+        window.addEventListener('online', () => {
+          try { socket.connect(); } catch (e) {}
         });
 
         socket.on('sync-ack', (data) => {
@@ -2824,14 +2833,14 @@
             const isTargetHost = p.id === myHostId;
             const canTransfer = isHost() && !isTargetHost && p.connected !== false;
             return (
-              '<div class="participant-row' + (p.connected === false ? ' offline' : '') + '">' +
+              '<div class="participant-row' + (p.connected === false ? ' offline' : '') + '" data-testid="participant-row">' +
               '<span class="participant-dot"></span>' +
-              '<span class="participant-name">' + escapeHtml(p.name) + '</span>' +
+              '<span class="participant-name" data-testid="participant-name">' + escapeHtml(p.name) + '</span>' +
               '<div class="participant-badges">' +
-              (isMe ? '<span class="badge badge-you">YOU</span>' : '') +
-              (isTargetHost ? '<span class="badge badge-host">HOST</span>' : '') +
+              (isMe ? '<span class="badge badge-you" data-testid="badge-you">YOU</span>' : '') +
+              (isTargetHost ? '<span class="badge badge-host" data-testid="badge-host">HOST</span>' : '') +
               (canTransfer
-                ? '<button type="button" class="btn-make-host" data-user-id="' + escapeHtml(p.id) + '" data-user-name="' + escapeHtml(p.name) + '" title="Transfer host role to ' + escapeHtml(p.name) + '">Make Host</button>'
+                ? '<button type="button" class="btn-make-host" data-testid="make-host-btn" data-user-id="' + escapeHtml(p.id) + '" data-user-name="' + escapeHtml(p.name) + '" title="Transfer host role to ' + escapeHtml(p.name) + '">Make Host</button>'
                 : '') +
               '</div>' +
               '</div>'
@@ -2856,18 +2865,22 @@
         });
       }
 
+      let currentPlaylist = [];
       function renderPlaylist(list) {
         if (!playlistEl) return;
+        currentPlaylist = list || [];
         if (!list.length) {
           playlistEl.innerHTML = '<div class="empty-notice">Empty — add a video below.</div>';
           return;
         }
-        playlistEl.innerHTML = list.map((it) =>
-          '<div class="playlist-item">' +
-          '<span class="title">' + escapeHtml(it.title || it.movieId) + '</span>' +
+        playlistEl.innerHTML = list.map((it, idx) =>
+          '<div class="playlist-item" data-testid="playlist-item">' +
+          '<span class="title" data-testid="playlist-item-title">' + escapeHtml(it.title || it.movieId) + '</span>' +
           '<span class="actions">' +
-          '<button data-play="' + escapeHtml(it.movieId) + '">Play</button>' +
-          '<button data-del="' + it.id + '">✕</button>' +
+          '<button data-play="' + escapeHtml(it.movieId) + '" data-testid="playlist-play-btn">Play</button>' +
+          (idx > 0 ? '<button data-move-up="' + it.id + '" data-testid="playlist-up-btn" title="Move up">▲</button>' : '') +
+          (idx < list.length - 1 ? '<button data-move-down="' + it.id + '" data-testid="playlist-down-btn" title="Move down">▼</button>' : '') +
+          '<button data-del="' + it.id + '" data-testid="playlist-delete-btn">✕</button>' +
           '</span>' +
           '</div>'
         ).join('');
@@ -2882,6 +2895,21 @@
           } else if (t.dataset && t.dataset.del) {
             clientSeq++;
             socket.emit('remove-video', { itemId: t.dataset.del, clientSeq, baseVersion, userId: socket.id });
+          } else if (t.dataset && (t.dataset.moveUp || t.dataset.moveDown)) {
+            const isUp = !!t.dataset.moveUp;
+            const targetId = isUp ? t.dataset.moveUp : t.dataset.moveDown;
+            const ids = currentPlaylist.map(p => p.id);
+            const idx = ids.indexOf(targetId);
+            if (idx !== -1) {
+              const swapIdx = isUp ? idx - 1 : idx + 1;
+              if (swapIdx >= 0 && swapIdx < ids.length) {
+                const temp = ids[idx];
+                ids[idx] = ids[swapIdx];
+                ids[swapIdx] = temp;
+                clientSeq++;
+                socket.emit('reorder-playlist', { itemIds: ids, clientSeq, baseVersion, userId: socket.id });
+              }
+            }
           }
         });
       }
@@ -2894,17 +2922,17 @@
         }
         const counts = {};
         Object.values(activePoll.votes || {}).forEach((opt) => { counts[opt] = (counts[opt] || 0) + 1; });
-        pollEl.innerHTML = '<div style="font-size:13px;color:#F5F5F5;font-weight:600;margin-bottom:6px;">' + escapeHtml(activePoll.question) + '</div>' +
+        pollEl.innerHTML = '<div data-testid="poll-question" style="font-size:13px;color:#F5F5F5;font-weight:600;margin-bottom:6px;">' + escapeHtml(activePoll.question) + '</div>' +
           activePoll.options.map((o) =>
-            '<div class="poll-option">' +
+            '<div class="poll-option" data-testid="poll-option">' +
             '<div class="poll-option-row"><span>' + escapeHtml(o.text) + '</span>' +
-            '<span style="font-size:12px;color:#737373;">' + (counts[o.id] || 0) + ' vote' + ((counts[o.id] || 0) !== 1 ? 's' : '') + '</span></div>' +
+            '<span data-testid="poll-vote-count" style="font-size:12px;color:#737373;">' + (counts[o.id] || 0) + ' vote' + ((counts[o.id] || 0) !== 1 ? 's' : '') + '</span></div>' +
             (activePoll.status === 'open'
-              ? '<button data-vote="' + o.id + '">Vote</button>'
+              ? '<button data-vote="' + o.id + '" data-testid="poll-vote-btn">Vote</button>'
               : '') +
             '</div>'
           ).join('') +
-          (activePoll.status === 'open' ? '<button id="closePollBtn" class="sidebar-btn" style="margin-top:8px;">Close poll</button>' : '<div class="empty-notice" style="margin-top:6px;">Poll Closed</div>');
+          (activePoll.status === 'open' ? '<button id="closePollBtn" data-testid="poll-close-btn" class="sidebar-btn" style="margin-top:8px;">Close poll</button>' : '<div class="empty-notice" data-testid="poll-closed-notice" style="margin-top:6px;">Poll Closed</div>');
       }
 
       if (pollEl) {
@@ -2969,9 +2997,11 @@
         if (!chatEl) return;
         const bubble = document.createElement('div');
         bubble.className = 'chat-message-bubble' + (isSystem ? ' system' : mine ? ' mine' : '');
+        bubble.setAttribute('data-testid', 'chat-message');
         if (!isSystem) {
           const author = document.createElement('span');
           author.className = 'chat-author';
+          author.setAttribute('data-testid', 'chat-author');
           author.textContent = who;
           bubble.appendChild(author);
         }
@@ -3007,6 +3037,7 @@
       function showReaction(emoji) {
         const span = document.createElement('span');
         span.className = 'reaction-float';
+        span.setAttribute('data-testid', 'reaction-float');
         span.textContent = emoji;
         span.style.left = (20 + Math.random() * 60) + '%';
         span.style.bottom = '80px';

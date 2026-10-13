@@ -183,6 +183,8 @@ const io = new Server(httpServer, {
     origin: '*',
     methods: ['GET', 'POST'],
   },
+  pingInterval: process.env.SOCKET_PING_INTERVAL ? Number(process.env.SOCKET_PING_INTERVAL) : 25000,
+  pingTimeout: process.env.SOCKET_PING_TIMEOUT ? Number(process.env.SOCKET_PING_TIMEOUT) : 20000,
 })
 
 const PORT = process.env.PORT || 3000
@@ -191,7 +193,7 @@ export const db = createDatabase()
 export const rooms = new Map<string, Room>()
 export const dirtyRooms = new Set<string>()
 let saveDebounceTimer: NodeJS.Timeout | null = null
-const gracePeriod = 60000 // 60 seconds
+const gracePeriod = process.env.RECONNECT_GRACE_MS ? Number(process.env.RECONNECT_GRACE_MS) : 60000 // default 60 seconds
 
 export function markRoomDirty(roomCode: string): void {
   dirtyRooms.add(roomCode)

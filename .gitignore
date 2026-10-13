@@ -12,3 +12,5 @@ server-smoke.log
 *.db
 *.db-wal
 *.db-shm
+playwright-report/
+test-results/
