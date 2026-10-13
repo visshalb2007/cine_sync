@@ -563,6 +563,165 @@
         padding: 12px 0;
       }
 
+      /* Movie Discovery styling */
+      .movie-results-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+        margin-top: 6px;
+      }
+      .movie-card {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-sm);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        transition: transform 0.12s ease, border-color 0.15s ease;
+        position: relative;
+      }
+      .movie-card:hover {
+        border-color: #444444;
+        transform: translateY(-2px);
+      }
+      .movie-card:focus-within {
+        border-color: #666666;
+      }
+      .movie-poster-wrap {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 2 / 3;
+        background: #191919;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+      }
+      .movie-poster-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+      .movie-poster-fallback {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        color: var(--text-muted);
+        font-size: 11px;
+        text-align: center;
+        padding: 8px;
+        width: 100%;
+        height: 100%;
+      }
+      .movie-badge-rating {
+        position: absolute;
+        top: 6px;
+        right: 6px;
+        background: rgba(10, 10, 10, 0.85);
+        color: #F59E0B;
+        font-size: 11px;
+        font-weight: 700;
+        padding: 2px 6px;
+        border-radius: 4px;
+        border: 1px solid rgba(245, 158, 11, 0.3);
+        display: flex;
+        align-items: center;
+        gap: 3px;
+        backdrop-filter: blur(4px);
+      }
+      .movie-card-body {
+        padding: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        flex: 1;
+        justify-content: space-between;
+      }
+      .movie-card-title {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-primary);
+        line-height: 1.3;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+      .movie-card-meta {
+        font-size: 11px;
+        color: var(--text-muted);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .movie-card-genres {
+        font-size: 10px;
+        color: var(--text-secondary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .movie-card-overview {
+        font-size: 10px;
+        color: var(--text-muted);
+        line-height: 1.3;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+      .movie-add-btn {
+        width: 100%;
+        padding: 6px 4px;
+        background: var(--bg-button);
+        border: 1px solid var(--border-subtle);
+        color: var(--text-primary);
+        font-size: 11px;
+        font-weight: 600;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background 0.15s, border-color 0.15s, color 0.15s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        margin-top: 4px;
+      }
+      .movie-add-btn:hover {
+        background: #FFFFFF;
+        color: #0A0A0A;
+        border-color: #FFFFFF;
+      }
+      .movie-add-btn:focus-visible {
+        outline: 2px solid #FFFFFF;
+        outline-offset: 1px;
+      }
+      .movie-add-btn.added {
+        background: #14532D;
+        border-color: #16A34A;
+        color: #BBF7D0;
+      }
+      .movie-loader {
+        display: inline-block;
+        width: 14px;
+        height: 14px;
+        border: 2px solid rgba(255,255,255,0.2);
+        border-top-color: #ffffff;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        vertical-align: middle;
+        margin-right: 6px;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+
       /* Main Content Area */
       .main-content {
         flex: 1;
@@ -1428,6 +1587,13 @@
             </svg>
             <span>Poll</span>
           </button>
+          <button type="button" class="sidebar-nav-item" id="navTabSearch" data-tab="search" aria-controls="sidebarViewSearch" role="tab" aria-selected="false">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <span>Discover</span>
+          </button>
         </nav>
 
         <!-- Main Video View in Sidebar -->
@@ -1525,6 +1691,41 @@
               <input type="text" class="sidebar-input" id="pollOptsInput" placeholder="Option 1, Option 2" />
               <button type="button" id="createPollBtn" class="sidebar-btn" disabled>Start Poll</button>
             </div>
+          </section>
+        </div>
+
+        <!-- Movie Discovery View in Sidebar -->
+        <div id="sidebarViewSearch" class="sidebar-panel-view" style="display: none;" role="tabpanel" aria-labelledby="navTabSearch">
+          <section class="sidebar-section">
+            <div class="sidebar-section-header">
+              <span>Movie Discovery</span>
+            </div>
+            <div class="sidebar-input-group">
+              <label for="movieSearchInput">Search Title</label>
+              <div style="position: relative; width: 100%;">
+                <input type="text" class="sidebar-input" id="movieSearchInput" placeholder="Search movies (e.g. Inception)..." autocomplete="off" />
+                <button type="button" id="movieSearchClear" aria-label="Clear search" title="Clear search" style="display: none; position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 13px; padding: 4px;">✕</button>
+              </div>
+
+              <div style="display: flex; gap: 8px;">
+                <div style="flex: 1;">
+                  <label for="movieGenreSelect">Genre</label>
+                  <select class="sidebar-input" id="movieGenreSelect" style="cursor: pointer;">
+                    <option value="">All Genres</option>
+                  </select>
+                </div>
+                <div style="width: 80px;">
+                  <label for="movieYearInput">Year</label>
+                  <input type="number" class="sidebar-input" id="movieYearInput" placeholder="YYYY" min="1888" max="2100" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Notice / Status Area (Loading, Empty, Error) -->
+            <div id="movieStatusNotice" class="empty-notice" style="display: none;"></div>
+
+            <!-- Results Grid -->
+            <div id="movieResultsGrid" class="movie-results-grid" aria-live="polite"></div>
           </section>
         </div>
       </aside>
@@ -1725,6 +1926,9 @@
       const playlistEl = $('playlist'), videoTitleInput = $('videoTitleInput'), videoUrlInput = $('videoUrlInput'), addVideoBtn = $('addVideoBtn');
       const pollEl = $('poll'), pollQInput = $('pollQInput'), pollOptsInput = $('pollOptsInput'), createPollBtn = $('createPollBtn');
       const setVideoInput = $('setVideoInput'), setVideoBtn = $('setVideoBtn');
+      const movieSearchInput = $('movieSearchInput'), movieSearchClear = $('movieSearchClear');
+      const movieGenreSelect = $('movieGenreSelect'), movieYearInput = $('movieYearInput');
+      const movieStatusNotice = $('movieStatusNotice'), movieResultsGrid = $('movieResultsGrid');
       const overlay = $('joinOverlay'), nameInput = $('nameInput'), codeInput = $('codeInput'), joinError = $('joinError');
       const noVideoHint = $('noVideoHint'), errBar = $('errBar');
       const mobileMenuToggle = $('mobileMenuToggle'), sidebar = $('sidebar');
@@ -1793,7 +1997,8 @@
       const navTabs = [
         { id: 'navTabVideo', view: 'sidebarViewVideo' },
         { id: 'navTabPlaylist', view: 'sidebarViewPlaylist' },
-        { id: 'navTabPoll', view: 'sidebarViewPoll' }
+        { id: 'navTabPoll', view: 'sidebarViewPoll' },
+        { id: 'navTabSearch', view: 'sidebarViewSearch' }
       ];
 
       navTabs.forEach((tab) => {
@@ -1803,14 +2008,278 @@
           navTabs.forEach(t => {
             const b = $(t.id);
             const v = $(t.view);
-            if (b) b.classList.remove('active');
+            if (b) {
+              b.classList.remove('active');
+              b.setAttribute('aria-selected', 'false');
+            }
             if (v) v.style.display = 'none';
           });
           btn.classList.add('active');
+          btn.setAttribute('aria-selected', 'true');
           const viewEl = $(tab.view);
           if (viewEl) viewEl.style.display = 'flex';
+
+          if (tab.id === 'navTabSearch') {
+            loadGenres();
+            if (!movieResultsGrid || movieResultsGrid.children.length === 0) {
+              runMovieSearch();
+            }
+          }
+        });
+
+        // Keyboard arrow navigation between tabs
+        btn.addEventListener('keydown', (e) => {
+          let targetTab = null;
+          const idx = navTabs.findIndex(t => t.id === tab.id);
+          if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+            e.preventDefault();
+            targetTab = navTabs[(idx + 1) % navTabs.length];
+          } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+            e.preventDefault();
+            targetTab = navTabs[(idx - 1 + navTabs.length) % navTabs.length];
+          }
+          if (targetTab) {
+            const targetBtn = $(targetTab.id);
+            if (targetBtn) {
+              targetBtn.focus();
+              targetBtn.click();
+            }
+          }
         });
       });
+
+      // ---------- Movie Discovery & Fuzzy Search ----------
+      let Fuse = null;
+      (async function initFuse() {
+        try {
+          const mod = await import('/vendor/fuse.mjs');
+          Fuse = mod.default || mod.Fuse || mod;
+        } catch (e) {
+          try {
+            const cdn = await import('https://cdn.jsdelivr.net/npm/fuse.js@7.0.0/dist/fuse.mjs');
+            Fuse = cdn.default || cdn.Fuse || cdn;
+          } catch (err) {
+            console.warn('Fuse.js client load warning', err);
+          }
+        }
+      })();
+
+      let searchDebounceTimer = null;
+      let searchAbortController = null;
+      let genresLoaded = false;
+
+      async function loadGenres() {
+        if (genresLoaded || !movieGenreSelect) return;
+        try {
+          const res = await fetch('/api/genres');
+          if (!res.ok) return;
+          const data = await res.json();
+          const list = Array.isArray(data) ? data : (data.genres || []);
+          if (list.length > 0) {
+            movieGenreSelect.innerHTML = '<option value="">All Genres</option>';
+            list.forEach(g => {
+              const opt = document.createElement('option');
+              const name = typeof g === 'string' ? g : g.name;
+              opt.value = name;
+              opt.textContent = name;
+              movieGenreSelect.appendChild(opt);
+            });
+            genresLoaded = true;
+          }
+        } catch (e) {
+          console.warn('Failed to load genres', e);
+        }
+      }
+
+      function showMovieStatus(message, isLoader = false) {
+        if (!movieStatusNotice) return;
+        if (!message) {
+          movieStatusNotice.style.display = 'none';
+          movieStatusNotice.innerHTML = '';
+          return;
+        }
+        movieStatusNotice.style.display = 'block';
+        movieStatusNotice.innerHTML = isLoader
+          ? '<span class="movie-loader"></span> ' + escapeHtml(message)
+          : escapeHtml(message);
+      }
+
+      function renderMovieResults(movies) {
+        if (!movieResultsGrid) return;
+        movieResultsGrid.innerHTML = '';
+        if (!movies || movies.length === 0) {
+          showMovieStatus('No movies found. Try a different title, genre, or year.');
+          return;
+        }
+        showMovieStatus('');
+
+        movieResultsGrid.innerHTML = movies.map(m => {
+          const ratingBadge = m.rating != null
+            ? '<span class="movie-badge-rating">★ ' + m.rating + '</span>'
+            : '';
+          const poster = m.posterUrl
+            ? '<img class="movie-poster-img" src="' + escapeHtml(m.posterUrl) + '" alt="' + escapeHtml(m.title) + ' poster" loading="lazy" onerror="this.style.display=\'none\';if(this.nextElementSibling)this.nextElementSibling.style.display=\'flex\';" /><div class="movie-poster-fallback" style="display:none;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect><line x1="7" y1="2" x2="7" y2="22"></line><line x1="17" y1="2" x2="17" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line></svg><span>No Poster</span></div>'
+            : '<div class="movie-poster-fallback"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect><line x1="7" y1="2" x2="7" y2="22"></line><line x1="17" y1="2" x2="17" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line></svg><span>No Poster</span></div>';
+          const metaYear = m.year ? '<span>' + escapeHtml(m.year) + '</span>' : '';
+          const metaGenres = m.genres && m.genres.length
+            ? '<div class="movie-card-genres">' + escapeHtml(m.genres.slice(0, 2).join(', ')) + '</div>'
+            : '';
+          const overviewText = m.overview ? '<div class="movie-card-overview" title="' + escapeHtml(m.overview) + '">' + escapeHtml(m.overview) + '</div>' : '';
+
+          return '<div class="movie-card" tabindex="0">' +
+            '<div class="movie-poster-wrap">' +
+              poster +
+              ratingBadge +
+            '</div>' +
+            '<div class="movie-card-body">' +
+              '<div>' +
+                '<div class="movie-card-title" title="' + escapeHtml(m.title) + '">' + escapeHtml(m.title) + '</div>' +
+                '<div class="movie-card-meta">' + metaYear + '</div>' +
+                metaGenres +
+                overviewText +
+              '</div>' +
+              '<button type="button" class="movie-add-btn" data-movie-id="' + escapeHtml(m.id) + '" data-movie-title="' + escapeHtml(m.title) + '"' + (m.year ? ' data-movie-year="' + escapeHtml(m.year) + '"' : '') + ' aria-label="Add ' + escapeHtml(m.title) + ' to playlist">' +
+                '+ Add to Playlist' +
+              '</button>' +
+            '</div>' +
+          '</div>';
+        }).join('');
+      }
+
+      async function runMovieSearch() {
+        const query = movieSearchInput ? movieSearchInput.value.trim() : '';
+        const genre = movieGenreSelect ? movieGenreSelect.value.trim() : '';
+        const year = movieYearInput ? movieYearInput.value.trim() : '';
+
+        if (movieSearchClear) {
+          movieSearchClear.style.display = query ? 'block' : 'none';
+        }
+
+        if (searchAbortController) {
+          searchAbortController.abort();
+        }
+        searchAbortController = new AbortController();
+
+        showMovieStatus('Searching movies...', true);
+
+        let url = '';
+        if (query) {
+          const params = new URLSearchParams({ q: query });
+          if (genre) params.append('genre', genre);
+          if (year && /^\d{4}$/.test(year)) params.append('year', year);
+          url = '/api/search?' + params.toString();
+        } else {
+          const params = new URLSearchParams();
+          if (genre) params.append('genre', genre);
+          url = '/api/movies' + (params.toString() ? '?' + params.toString() : '');
+        }
+
+        try {
+          const res = await fetch(url, { signal: searchAbortController.signal });
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            showMovieStatus(errData.error || 'Failed to search movies. Please try again.');
+            if (movieResultsGrid) movieResultsGrid.innerHTML = '';
+            return;
+          }
+          const data = await res.json();
+          let results = (data && data.results) || [];
+
+          // Client-side fuzzy re-ranking using Fuse.js
+          if (query && Fuse && results.length > 0) {
+            try {
+              const fuse = new Fuse(results, {
+                keys: [
+                  { name: 'title', weight: 0.7 },
+                  { name: 'genres', weight: 0.2 },
+                  { name: 'overview', weight: 0.1 }
+                ],
+                threshold: 0.4,
+                ignoreLocation: true
+              });
+              const searchHits = fuse.search(query).map(r => r.item);
+              const hitIds = new Set(searchHits.map(h => h.id));
+              const remainder = results.filter(r => !hitIds.has(r.id));
+              results = [...searchHits, ...remainder];
+            } catch (e) {
+              console.warn('Fuse re-ranking error', e);
+            }
+          }
+
+          renderMovieResults(results);
+        } catch (err) {
+          if (err.name === 'AbortError') return;
+          showMovieStatus('Failed to load movies. Check connection.');
+          if (movieResultsGrid) movieResultsGrid.innerHTML = '';
+        }
+      }
+
+      function scheduleMovieSearch() {
+        if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+        searchDebounceTimer = setTimeout(() => {
+          runMovieSearch();
+        }, 300);
+      }
+
+      if (movieSearchInput) {
+        movieSearchInput.addEventListener('input', scheduleMovieSearch);
+        movieSearchInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') {
+            movieSearchInput.value = '';
+            scheduleMovieSearch();
+          }
+        });
+      }
+
+      if (movieSearchClear) {
+        movieSearchClear.addEventListener('click', () => {
+          if (movieSearchInput) {
+            movieSearchInput.value = '';
+            movieSearchInput.focus();
+            scheduleMovieSearch();
+          }
+        });
+      }
+
+      if (movieGenreSelect) {
+        movieGenreSelect.addEventListener('change', scheduleMovieSearch);
+      }
+
+      if (movieYearInput) {
+        movieYearInput.addEventListener('input', scheduleMovieSearch);
+      }
+
+      // Add to playlist from discovery grid
+      if (movieResultsGrid) {
+        movieResultsGrid.addEventListener('click', (e) => {
+          const btn = e.target.closest('.movie-add-btn');
+          if (!btn) return;
+          if (!joined || !socket) {
+            showError('Please join or create a room first.');
+            return;
+          }
+          const movieId = btn.dataset.movieId;
+          const movieTitle = btn.dataset.movieTitle || 'Untitled Movie';
+          const movieYear = btn.dataset.movieYear;
+          const title = movieTitle + (movieYear ? ' (' + movieYear + ')' : '');
+
+          clientSeq++;
+          socket.emit('add-video', {
+            movieId,
+            title,
+            clientSeq,
+            baseVersion,
+            userId: socket.id
+          });
+
+          btn.classList.add('added');
+          btn.textContent = '✓ Added to Playlist';
+          setTimeout(() => {
+            btn.classList.remove('added');
+            btn.textContent = '+ Add to Playlist';
+          }, 1500);
+        });
+      }
 
       // Mobile Menu Toggle
       if (mobileMenuToggle && sidebar) {
@@ -2627,6 +3096,7 @@
       // ---------- Boot ----------
       (async function boot() {
         try {
+          loadGenres();
           const ioFn = await getIo();
           wireSocket(ioFn);
         } catch (err) {

@@ -3,6 +3,11 @@ import { Server } from 'socket.io'
 import express from 'express'
 import path from 'path'
 import fs from 'fs'
+import { loadEnv } from './env'
+import { searchMovies, getMovies, getTmdbGenres } from './api/tmdb'
+import { createIpRateLimiter } from './api/rateLimiter'
+
+loadEnv()
 
 const app = express()
 const httpServer = createServer(app)
@@ -18,12 +23,128 @@ const clientDir =
   clientDirCandidates.find((d) => fs.existsSync(path.join(d, 'index.html'))) ??
   clientDirCandidates[0]
 app.use(express.static(clientDir))
+
+// Serve fuse.js library for client-side fuzzy re-ranking
+app.get('/vendor/fuse.mjs', (_req, res) => {
+  const candidates = [
+    path.join(__dirname, '..', 'node_modules', 'fuse.js', 'dist', 'fuse.mjs'),
+    path.join(__dirname, '..', '..', 'node_modules', 'fuse.js', 'dist', 'fuse.mjs'),
+    path.join(process.cwd(), 'node_modules', 'fuse.js', 'dist', 'fuse.mjs'),
+  ]
+  const found = candidates.find((p) => fs.existsSync(p))
+  if (found) {
+    res.setHeader('Content-Type', 'application/javascript')
+    return res.sendFile(found)
+  }
+  res.status(404).json({ error: 'fuse.js not found' })
+})
+
 app.get('/health', (_req, res) => {
   res.json({ ok: true, rooms: rooms.size, now: Date.now() })
 })
 app.get('/', (_req, res) => {
   res.sendFile(path.join(clientDir, 'index.html'))
 })
+
+// Movie discovery rate limiter: 60 req/min per IP
+export const movieApiLimiter = createIpRateLimiter({
+  windowMs: 60 * 1000,
+  max: 60,
+  message: 'Too many requests, please try again later',
+})
+
+// GET /api/genres - returns list of movie genres
+app.get('/api/genres', movieApiLimiter, async (_req, res) => {
+  try {
+    const genres = await getTmdbGenres()
+    res.json({ genres })
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to retrieve genres' })
+  }
+})
+
+// GET /api/search?q=&genre=&year=&page= - search movies with query validation and rate limiting
+app.get('/api/search', movieApiLimiter, async (req, res) => {
+  try {
+    const qRaw = req.query.q
+    if (typeof qRaw !== 'string' || !qRaw.trim()) {
+      return res.status(400).json({ error: 'Query parameter "q" is required and cannot be empty' })
+    }
+    const q = qRaw.trim()
+
+    let yearNum: number | undefined
+    if (req.query.year !== undefined && req.query.year !== '') {
+      const yearStr = String(req.query.year).trim()
+      const parsed = Number(yearStr)
+      if (!/^\d{4}$/.test(yearStr) || isNaN(parsed) || parsed < 1888 || parsed > 2100) {
+        return res.status(400).json({
+          error: 'Invalid year parameter: must be a 4-digit year between 1888 and 2100',
+        })
+      }
+      yearNum = parsed
+    }
+
+    let pageNum: number = 1
+    if (req.query.page !== undefined && req.query.page !== '') {
+      const pageStr = String(req.query.page).trim()
+      const parsed = Number(pageStr)
+      if (!/^\d+$/.test(pageStr) || isNaN(parsed) || parsed < 1) {
+        return res.status(400).json({
+          error: 'Invalid page parameter: must be a positive integer',
+        })
+      }
+      pageNum = parsed
+    }
+
+    const genre =
+      typeof req.query.genre === 'string' && req.query.genre.trim()
+        ? req.query.genre.trim()
+        : undefined
+
+    const result = await searchMovies({
+      query: q,
+      genre,
+      year: yearNum,
+      page: pageNum,
+    })
+
+    res.json(result)
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to search movies' })
+  }
+})
+
+// GET /api/movies?genre=&page= - browse/discover movies by genre with page validation
+app.get('/api/movies', movieApiLimiter, async (req, res) => {
+  try {
+    let pageNum: number = 1
+    if (req.query.page !== undefined && req.query.page !== '') {
+      const pageStr = String(req.query.page).trim()
+      const parsed = Number(pageStr)
+      if (!/^\d+$/.test(pageStr) || isNaN(parsed) || parsed < 1) {
+        return res.status(400).json({
+          error: 'Invalid page parameter: must be a positive integer',
+        })
+      }
+      pageNum = parsed
+    }
+
+    const genre =
+      typeof req.query.genre === 'string' && req.query.genre.trim()
+        ? req.query.genre.trim()
+        : undefined
+
+    const result = await getMovies({
+      genre,
+      page: pageNum,
+    })
+
+    res.json(result)
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to discover movies' })
+  }
+})
+
 // Resolve bare video ids (legacy + playlist entries) to streamable URLs.
 app.get('/watch/:id', (req, res) => {
   const id = String(req.params.id ?? '')
@@ -35,6 +156,8 @@ app.get('/watch/:id', (req, res) => {
     const file = path.join(clientDir, 'media', path.basename(id))
     if (fs.existsSync(file)) return res.redirect(`/media/${path.basename(id)}`)
   }
+  // For discovered movie items without direct media files, redirect to sample video so stream plays
+  if (SAMPLES.sintel) return res.redirect(SAMPLES.sintel.url)
   res.status(404).json({ error: 'unknown video id', samples: Object.keys(SAMPLES) })
 })
 app.get('/api/samples', (_req, res) => {
@@ -733,6 +856,10 @@ setInterval(() => {
   io.emit('server-time', { serverTime: Date.now() })
 }, 30000)
 
-httpServer.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`)
-})
+if (!process.env.VITEST) {
+  httpServer.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`)
+  })
+}
+
+export { app, httpServer, io }

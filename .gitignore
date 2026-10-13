@@ -1,7 +1,10 @@
 node_modules/
 *.local
 dist/
+.env
+.env.*
 *.env
+!.env.example
 # Sample videos are fetched on demand (npm run fetch-media), not committed
 client/public/media/*.mp4
 server.log
