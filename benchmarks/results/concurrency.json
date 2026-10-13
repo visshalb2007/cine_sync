@@ -1,0 +1,83 @@
+{
+  "scenario": "concurrency",
+  "viewers": 10,
+  "commands": 200,
+  "runs": [
+    {
+      "run": 1,
+      "durationMs": 1136.2,
+      "stats": {
+        "totalCommands": 200,
+        "successful": 20,
+        "conflictsRejected": 180,
+        "converged": true,
+        "finalVersion": 30,
+        "p50": 1.65,
+        "p95": 2.48,
+        "max": 2.48
+      },
+      "targetMet": true
+    },
+    {
+      "run": 2,
+      "durationMs": 1122.45,
+      "stats": {
+        "totalCommands": 200,
+        "successful": 20,
+        "conflictsRejected": 180,
+        "converged": true,
+        "finalVersion": 30,
+        "p50": 1.29,
+        "p95": 2.28,
+        "max": 2.28
+      },
+      "targetMet": true
+    },
+    {
+      "run": 3,
+      "durationMs": 1141.4,
+      "stats": {
+        "totalCommands": 200,
+        "successful": 20,
+        "conflictsRejected": 180,
+        "converged": true,
+        "finalVersion": 30,
+        "p50": 1.09,
+        "p95": 1.56,
+        "max": 1.56
+      },
+      "targetMet": true
+    }
+  ],
+  "medianRun": {
+    "durationMs": 1122.45,
+    "stats": {
+      "totalCommands": 200,
+      "successful": 20,
+      "conflictsRejected": 180,
+      "converged": true,
+      "finalVersion": 30,
+      "p50": 1.29,
+      "p95": 2.28,
+      "max": 2.28
+    },
+    "targetMet": true
+  },
+  "variance": {
+    "p95Latency": {
+      "variance": 0.156,
+      "stdDev": 0.395,
+      "min": 1.56,
+      "max": 2.48
+    },
+    "convergenceRate": 1
+  },
+  "testConditions": {
+    "hardware": "13th Gen Intel(R) Core(TM) i7-13620H (16 vCPUs, 16GB RAM)",
+    "os": "Windows 11 (Microsoft Windows NT 10.0.26300.0)",
+    "nodeVersion": "v24.16.0",
+    "networkType": "localhost",
+    "date": "2026-10-13",
+    "timestamp": "2026-10-13T19:08:30.671Z"
+  }
+}

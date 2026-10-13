@@ -1,0 +1,94 @@
+{
+  "title": "CineSync Benchmark Suite Summary",
+  "generatedAt": "2026-10-14T00:39:00.000Z",
+  "testConditions": {
+    "hardware": "13th Gen Intel(R) Core(TM) i7-13620H (16 vCPUs, 16GB RAM)",
+    "os": "Windows 11 (Microsoft Windows NT 10.0.26300.0)",
+    "nodeVersion": "v24.16.0",
+    "networkType": "localhost",
+    "date": "2026-10-14"
+  },
+  "targets": {
+    "p95Latency": {
+      "threshold": "<= 250ms",
+      "measured": 1.31,
+      "passed": true
+    },
+    "p95Drift": {
+      "threshold": "<= 500ms",
+      "measured": 100.74,
+      "passed": true
+    },
+    "steadyStateDrift": {
+      "threshold": "<= 500ms",
+      "measured": 17.29,
+      "passed": true
+    },
+    "concurrencyConvergence": {
+      "threshold": "100%",
+      "measured": "100%",
+      "passed": true
+    }
+  },
+  "scenarios": {
+    "latency": {
+      "viewers": 10,
+      "commands": 100,
+      "runs": 3,
+      "median": {
+        "p50": 0.59,
+        "p95": 1.31,
+        "p99": 6.01,
+        "max": 6.01,
+        "mean": 0.72,
+        "failures": 0,
+        "errorRate": 0.0
+      },
+      "variance": {
+        "p95Variance": 0.012,
+        "p95StdDev": 0.11,
+        "p95Min": 1.17,
+        "p95Max": 1.44
+      }
+    },
+    "drift": {
+      "viewers": 10,
+      "checks": 500,
+      "samples": 5000,
+      "runs": 3,
+      "median": {
+        "p50": 6.71,
+        "p95": 100.74,
+        "p99": 113.09,
+        "max": 118.33,
+        "steadyState": 17.29,
+        "maxBeforeCorrection": 118.33
+      },
+      "variance": {
+        "p95DriftVariance": 0.08,
+        "p95DriftStdDev": 0.283,
+        "steadyStateVariance": 6.421,
+        "steadyStateStdDev": 2.534
+      }
+    },
+    "concurrency": {
+      "viewers": 10,
+      "commands": 200,
+      "runs": 3,
+      "median": {
+        "totalCommands": 200,
+        "successful": 20,
+        "conflictsResolved": 180,
+        "converged": true,
+        "finalVersion": 30,
+        "p50Latency": 1.29,
+        "p95Latency": 2.28
+      },
+      "variance": {
+        "p95LatencyVariance": 0.156,
+        "p95LatencyStdDev": 0.395,
+        "convergenceRate": 1.0
+      }
+    }
+  }
+}

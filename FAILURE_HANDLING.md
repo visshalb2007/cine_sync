@@ -14,6 +14,7 @@ This document summarizes all failure scenarios identified during development and
 6. [Invalid Room Code/Expired Link](#6-invalid-room-codeexpired-link)
 7. [Network Conditions](#7-network-conditions)
 8. [Drift Scenarios](#8-drift-scenarios)
+9. [Measured Benchmark Results & Validation](#9-measured-benchmark-results--validation)
 
 ---
 
@@ -279,19 +280,75 @@ This document summarizes all failure scenarios identified during development and
 
 ---
 
+## 9. Measured Benchmark Results & Validation
+
+Automated benchmark runs were executed using `bot-harness.ts` simulating 10 concurrent viewers against the synchronization server. Each scenario was run 3 times with prior server warmup.
+
+### Test Environment Specifications
+
+- **Date**: October 14, 2026
+- **Hardware Spec**: 13th Gen Intel(R) Core(TM) i7-13620H (16 vCPUs / 10 cores, 16 GB RAM)
+- **Operating System**: Windows 11 (Microsoft Windows NT 10.0.26300.0)
+- **Node.js Version**: v24.16.0
+- **Network Conditions**: localhost (loopback 127.0.0.1)
+
+---
+
+### Target Verification Summary
+
+| Target Metric | Design Doc Threshold | Measured Median | Multi-Run Variance | Evaluation |
+|:---|:---|:---|:---|:---|
+| **Control Propagation Latency (p95)** | **≤ 250 ms** | **1.31 ms** | **0.012 (std dev: ±0.11 ms)** | **PASS ✓** |
+| **Viewer Playback Drift (p95)** | **≤ 500 ms** | **100.74 ms** | **0.080 (std dev: ±0.28 ms)** | **PASS ✓** |
+| **Steady-State Drift (post-correction)** | **≤ 500 ms** | **17.29 ms** | **6.421 (std dev: ±2.53 ms)** | **PASS ✓** |
+| **Concurrency State Convergence** | **100% convergence** | **100%** | **0 (100% across all 3 runs)** | **PASS ✓** |
+
+---
+
+### Detailed Scenario Results
+
+#### 1. Latency Scenario (`--scenario latency --viewers 10 --commands 100`)
+Measures round-trip time from command issuance to broadcast `state-update` arrival matching the unique echoed `clientSeq` using high-resolution `performance.now()` timestamps.
+
+- **Run 1**: p50 = 0.67 ms, p95 = 1.17 ms, p99 = 1.48 ms, max = 1.48 ms, failures = 0, duration = 1563.74 ms
+- **Run 2**: p50 = 0.59 ms, p95 = 1.31 ms, p99 = 6.01 ms, max = 6.01 ms, failures = 0, duration = 1557.02 ms
+- **Run 3**: p50 = 0.55 ms, p95 = 1.44 ms, p99 = 6.21 ms, max = 6.21 ms, failures = 0, duration = 1575.42 ms
+- **Median Run**: **p50 = 0.59 ms**, **p95 = 1.31 ms**, **p99 = 6.01 ms**, **max = 6.01 ms**, **mean = 0.72 ms**, **failures = 0 (0.0% error rate)**
+- **Result**: **PASS ✓** (1.31 ms << 250 ms target)
+
+#### 2. Drift Scenario (`--scenario drift --viewers 10 --commands 500`)
+Measures real playback position of each viewer against the authoritative server timestamp, evaluating CineSync's dual-tier drift correction state machine across 5,000 samples.
+
+- **Run 1**: p50 = 6.74 ms, p95 = 100.83 ms, p99 = 111.14 ms, max = 118.89 ms, steady-state = 16.22 ms
+- **Run 2**: p50 = 7.50 ms, p95 = 100.19 ms, p99 = 110.29 ms, max = 116.45 ms, steady-state = 22.05 ms
+- **Run 3**: p50 = 6.71 ms, p95 = 100.74 ms, p99 = 113.09 ms, max = 118.33 ms, steady-state = 17.29 ms
+- **Median Run**: **p50 = 6.71 ms**, **p95 = 100.74 ms**, **p99 = 113.09 ms**, **max = 118.33 ms**, **steady-state = 17.29 ms**
+- **Result**: **PASS ✓** (100.74 ms p95 drift and 17.29 ms steady-state drift << 500 ms target)
+
+#### 3. Concurrency Scenario (`--scenario concurrency --viewers 10 --commands 200`)
+10 viewers issue concurrent bursts of conflicting commands using current versions. Verifies atomic version incrementing, conflict rejection with latest state resync, and eventual state convergence.
+
+- **Run 1**: 200 commands, 20 successful updates, 180 stale conflicts gracefully rejected & resynced, **converged = true**, finalVersion = 30
+- **Run 2**: 200 commands, 20 successful updates, 180 stale conflicts gracefully rejected & resynced, **converged = true**, finalVersion = 30
+- **Run 3**: 200 commands, 20 successful updates, 180 stale conflicts gracefully rejected & resynced, **converged = true**, finalVersion = 30
+- **Median Run**: **Convergence = 100% (all 10 bots converged to identical version 30 and playback state)**, p50 latency = 1.29 ms, p95 latency = 2.28 ms
+- **Result**: **PASS ✓**
+
+---
+
 ## Appendix: Test Conditions Documented
 
 | Condition | Value |
-|-----------|-------|
-| Hardware | Development laptop/desktop |
-| OS | Windows 10/11, macOS, Ubuntu |
-| Node.js Version | v20+ (compatible with v24.x tested) |
-| Network Type | localhost, LAN (wired), Wi-Fi |
-| Number of Users | 2-10 per room (tested up to 10) |
-| Command Rate | 1 command/second typical, burst up to 10/s |
+|---|---|
+| Hardware | 13th Gen Intel(R) Core(TM) i7-13620H (16 vCPUs, 16GB RAM) |
+| OS | Windows 11 (Microsoft Windows NT 10.0.26300.0) |
+| Node.js Version | v24.16.0 |
+| Network Type | localhost (loopback 127.0.0.1) |
+| Number of Viewers Tested | 10 concurrent viewers per room |
+| Command Rate | High-throughput bursts up to 200 commands |
 | Payload Size | ~200 bytes typical message size |
-| Clock Sync | NTP-style, re-sync every 30s |
-| Drift Check Interval | 2 seconds |
+| Clock Sync | NTP-style client-hello / sync-ack, re-sync every 30s |
+| Drift Check Interval | Every 100ms / 500ms intervals |
 | Hysteresis Threshold | 2 consecutive checks |
 | Grace Period | 60 seconds |
 | Hard Drift Threshold | 500ms |
@@ -302,9 +359,10 @@ This document summarizes all failure scenarios identified during development and
 
 ## Future Improvements
 
-- [ ] Persistence layer migration from in-memory to SQLite/Postgres
+- [x] Persistence layer migration from in-memory to SQLite with WAL mode
+- [x] High-resolution benchmark harness with clientSeq matching and automated reports
 - [ ] Multi-node scaling with Redis pub/sub
 - [ ] Adaptive drift correction based on historical patterns
 - [ ] Client-side bandwidth estimation for rate adjustment
-- [] Advanced network emulation in test harness (`tc netem`)
-- [] Automated failure injection CI pipeline
+- [ ] Advanced network emulation in test harness (`tc netem`)
+- [ ] Automated failure injection CI pipeline

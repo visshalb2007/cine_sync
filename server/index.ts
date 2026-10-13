@@ -616,12 +616,13 @@ io.on('connection', (socket) => {
         message: 'Stale version, resynced to latest state',
         version: room.version,
         playbackState: room.playbackState,
+        clientSeq,
       })
       return
     }
 
     if (!canControl(room, socket.id)) {
-      socket.emit('error', { message: 'Only the host can control playback right now' })
+      socket.emit('error', { message: 'Only the host can control playback right now', clientSeq })
       return
     }
 
@@ -644,6 +645,8 @@ io.on('connection', (socket) => {
     io.to(roomCode).emit('state-update', {
       playbackState: room.playbackState,
       version: room.version,
+      clientSeq,
+      senderSocketId: socket.id,
     })
   })
 
@@ -659,12 +662,13 @@ io.on('connection', (socket) => {
         message: 'Stale version, resynced to latest state',
         version: room.version,
         playbackState: room.playbackState,
+        clientSeq,
       })
       return
     }
 
     if (!canControl(room, socket.id)) {
-      socket.emit('error', { message: 'Only the host can control playback right now' })
+      socket.emit('error', { message: 'Only the host can control playback right now', clientSeq })
       return
     }
 
@@ -675,6 +679,8 @@ io.on('connection', (socket) => {
     io.to(roomCode).emit('state-update', {
       playbackState: room.playbackState,
       version: room.version,
+      clientSeq,
+      senderSocketId: socket.id,
     })
   })
 
@@ -686,12 +692,17 @@ io.on('connection', (socket) => {
     if (!room) return
 
     if (room.version !== baseVersion) {
-      socket.emit('error', { message: 'Stale version' })
+      socket.emit('error', {
+        message: 'Stale version',
+        version: room.version,
+        playbackState: room.playbackState,
+        clientSeq,
+      })
       return
     }
 
     if (!canControl(room, socket.id, userId)) {
-      socket.emit('error', { message: 'Only the host can change the video right now' })
+      socket.emit('error', { message: 'Only the host can change the video right now', clientSeq })
       return
     }
 
@@ -704,6 +715,8 @@ io.on('connection', (socket) => {
     io.to(roomCode).emit('state-update', {
       playbackState: room.playbackState,
       version: room.version,
+      clientSeq,
+      senderSocketId: socket.id,
     })
   })
 
@@ -719,12 +732,13 @@ io.on('connection', (socket) => {
         message: 'Stale version, resynced to latest state',
         version: room.version,
         playbackState: room.playbackState,
+        clientSeq,
       })
       return
     }
 
     if (!canControl(room, socket.id)) {
-      socket.emit('error', { message: 'Only the host can change playback speed right now' })
+      socket.emit('error', { message: 'Only the host can change playback speed right now', clientSeq })
       return
     }
 
@@ -744,6 +758,8 @@ io.on('connection', (socket) => {
     io.to(roomCode).emit('state-update', {
       playbackState: room.playbackState,
       version: room.version,
+      clientSeq,
+      senderSocketId: socket.id,
     })
   })
 
@@ -1158,6 +1174,12 @@ serverTimeTimer.unref()
 if (!process.env.VITEST) {
   httpServer.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`)
+  }).on('error', (err: any) => {
+    if (err.code === 'EADDRINUSE') {
+      console.log(`Port ${PORT} is already in use, assuming server is running.`)
+    } else {
+      console.error(err)
+    }
   })
 }
 

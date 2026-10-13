@@ -1,0 +1,92 @@
+{
+  "scenario": "drift",
+  "viewers": 10,
+  "commands": 500,
+  "runs": [
+    {
+      "run": 1,
+      "durationMs": 7765.86,
+      "stats": {
+        "p50": 6.74,
+        "p95": 100.83,
+        "p99": 111.14,
+        "max": 118.89,
+        "min": 0,
+        "mean": 24.76,
+        "count": 5000,
+        "maxBeforeCorrection": 118.89,
+        "steadyState": 16.22
+      },
+      "targetMet": true
+    },
+    {
+      "run": 2,
+      "durationMs": 7781.67,
+      "stats": {
+        "p50": 7.5,
+        "p95": 100.19,
+        "p99": 110.29,
+        "max": 116.45,
+        "min": 0,
+        "mean": 25.12,
+        "count": 5000,
+        "maxBeforeCorrection": 116.45,
+        "steadyState": 22.05
+      },
+      "targetMet": true
+    },
+    {
+      "run": 3,
+      "durationMs": 7786.63,
+      "stats": {
+        "p50": 6.71,
+        "p95": 100.74,
+        "p99": 113.09,
+        "max": 118.33,
+        "min": 0,
+        "mean": 24.83,
+        "count": 5000,
+        "maxBeforeCorrection": 118.33,
+        "steadyState": 17.29
+      },
+      "targetMet": true
+    }
+  ],
+  "medianRun": {
+    "durationMs": 7786.63,
+    "stats": {
+      "p50": 6.71,
+      "p95": 100.74,
+      "p99": 113.09,
+      "max": 118.33,
+      "min": 0,
+      "mean": 24.83,
+      "count": 5000,
+      "maxBeforeCorrection": 118.33,
+      "steadyState": 17.29
+    },
+    "targetMet": true
+  },
+  "variance": {
+    "p95Drift": {
+      "variance": 0.08,
+      "stdDev": 0.283,
+      "min": 100.19,
+      "max": 100.83
+    },
+    "steadyState": {
+      "variance": 6.421,
+      "stdDev": 2.534,
+      "min": 16.22,
+      "max": 22.05
+    }
+  },
+  "testConditions": {
+    "hardware": "13th Gen Intel(R) Core(TM) i7-13620H (16 vCPUs, 16GB RAM)",
+    "os": "Windows 11 (Microsoft Windows NT 10.0.26300.0)",
+    "nodeVersion": "v24.16.0",
+    "networkType": "localhost",
+    "date": "2026-10-13",
+    "timestamp": "2026-10-13T19:07:15.710Z"
+  }
+}
