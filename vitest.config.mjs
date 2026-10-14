@@ -4,8 +4,8 @@ export default defineConfig({
   test: {
     include: ['tests/**/*.test.ts'],
     exclude: ['e2e/**/*', 'node_modules/**/*'],
+    pool: 'forks',
     fileParallelism: false,
-    isolate: false,
     forks: {
       singleFork: true,
     },
