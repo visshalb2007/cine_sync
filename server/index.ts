@@ -954,7 +954,7 @@ io.on('connection', (socket) => {
   })
 
   // Handle playlist commands
-  socket.on('add-video', ({ movieId, title, clientSeq, baseVersion, userId }: { movieId: string; title: string; clientSeq: number; baseVersion: number; userId: string }) => {
+  socket.on('add-video', ({ movieId, title, clientSeq, baseVersion, userId, sources }: { movieId: string; title: string; clientSeq: number; baseVersion: number; userId: string; sources?: VideoSource[] }) => {
     const roomCode = (socket as any).roomCode
     if (!roomCode) return
 
@@ -972,12 +972,17 @@ io.on('connection', (socket) => {
       return
     }
 
+    const normalizedSources: VideoSource[] = Array.isArray(sources) && sources.length > 0
+      ? sources
+      : [{ url: movieId, quality: 'Auto' }]
+
     const newPlaylistItem: PlaylistItem = {
       id: Math.random().toString(36).substring(2, 9),
       movieId,
       title,
       addedBy: userId,
       order: room.playbackState.playlist.length,
+      sources: normalizedSources,
     }
 
     const newPlaylist = [...room.playbackState.playlist, newPlaylistItem]

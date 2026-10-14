@@ -1083,6 +1083,32 @@
         font-weight: 600;
       }
 
+      /* Quality Selector */
+      .quality-select-wrap {
+        display: flex;
+        align-items: center;
+        gap: 3px;
+        background: #141414;
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-sm);
+        padding: 2px 6px;
+        font-size: 11px;
+        color: var(--text-secondary);
+      }
+      .quality-select {
+        background: transparent;
+        border: none;
+        color: var(--text-primary);
+        font-size: 11px;
+        font-weight: 600;
+        cursor: pointer;
+        outline: none;
+      }
+      .quality-select option {
+        background: #191919;
+        color: #F5F5F5;
+      }
+
       .volume-group {
         display: flex;
         align-items: center;
@@ -2007,6 +2033,14 @@
                 <button type="button" class="btn-sub-reset" id="subOffsetResetBtn" data-testid="sub-offset-reset" aria-label="Reset subtitle offset to 0ms" title="Reset offset">↺</button>
               </div>
 
+              <!-- Video Quality Selector Dropdown -->
+              <div class="quality-select-wrap" id="qualitySelectWrap" data-testid="quality-select-wrap" title="Select Video Quality">
+                <label for="qualitySelect" style="font-size: 11px; color: var(--text-secondary); margin-right: 2px;">Quality:</label>
+                <select id="qualitySelect" data-testid="quality-select" class="quality-select" aria-label="Video Quality">
+                  <option value="Auto">Auto</option>
+                </select>
+              </div>
+
               <!-- Sync & Drift Stats -->
               <div class="sync-status-group">
                 <span class="status status-drift ok" id="driftLabel" data-testid="drift-label">drift: 0ms</span>
@@ -2048,8 +2082,8 @@
               <input id="setVideoInput" data-testid="set-video-input" class="url-input" type="text" placeholder="Set shared direct MP4/WebM URL — not YouTube (host)" />
             </div>
             <button id="setVideoBtn" data-testid="set-video-btn" class="btn-set-video">Set video</button>
-            <button class="btn-preset sample-btn" data-sample="flower">Flower</button>
-            <button class="btn-preset sample-btn" data-sample="sintel">Sintel</button>
+            <button class="btn-preset sample-btn" data-sample="flower" data-testid="sample-flower-btn">Flower</button>
+            <button class="btn-preset sample-btn" data-sample="sintel" data-testid="sample-sintel-btn">Sintel</button>
             <label class="btn-local-file" id="openLocalBtn">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
@@ -2235,6 +2269,83 @@
           if (socket && socket.connected) {
             socket.emit('subtitle-offset', { offsetMs: 0 });
           }
+        });
+      }
+
+      // Per-user Video Quality Selection
+      const qualitySelect = $('qualitySelect');
+      let activeSources = [];
+      let preferredQuality = 'Auto';
+      window.__currentQuality = 'Auto';
+
+      function getSourcesForVideo(videoId) {
+        if (typeof currentPlaylist !== 'undefined' && currentPlaylist && currentPlaylist.length) {
+          const item = currentPlaylist.find((p) => p.movieId === videoId || (p.sources && p.sources.some((s) => s.url === videoId)));
+          if (item && Array.isArray(item.sources) && item.sources.length > 0) {
+            return item.sources;
+          }
+        }
+        if (videoId && (videoId.includes('sintel') || (typeof SAMPLES !== 'undefined' && videoId === SAMPLES.sintel))) {
+          return [
+            { url: '/media/sintel-trailer.mp4', quality: '1080p' },
+            { url: '/media/sintel-trailer.mp4?q=720p', quality: '720p' },
+            { url: '/media/sintel-trailer.mp4?q=480p', quality: '480p' },
+          ];
+        }
+        return [{ url: resolveSrc(videoId), quality: 'Auto' }];
+      }
+
+      function updateQualityOptions(sources) {
+        if (!qualitySelect) return;
+        activeSources = Array.isArray(sources) && sources.length > 0
+          ? sources
+          : [{ url: resolveSrc(storedState ? storedState.videoId : ''), quality: 'Auto' }];
+
+        qualitySelect.innerHTML = '';
+        activeSources.forEach((s) => {
+          const opt = document.createElement('option');
+          opt.value = s.quality;
+          opt.textContent = s.quality;
+          qualitySelect.appendChild(opt);
+        });
+
+        const matching = activeSources.find((s) => s.quality === preferredQuality) || activeSources[0];
+        if (matching) {
+          qualitySelect.value = matching.quality;
+          window.__currentQuality = matching.quality;
+        }
+      }
+
+      function switchQuality(newQuality) {
+        if (!activeSources || !activeSources.length) return;
+        const matching = activeSources.find((s) => s.quality === newQuality);
+        if (!matching || !matching.url) return;
+
+        preferredQuality = newQuality;
+        window.__currentQuality = newQuality;
+
+        // 1. Preserve current playback position and play state
+        const curPos = isFinite(video.currentTime) && video.currentTime > 0
+          ? video.currentTime
+          : (typeof expectedPosition === 'function' ? expectedPosition() / 1000 : 0);
+        const wasPlaying = !video.paused || (storedState && storedState.status === 'playing');
+
+        // 2. Switch video source URL
+        const newSrc = resolveSrc(matching.url);
+        video.src = newSrc;
+        try { video.currentTime = curPos; } catch (e) {}
+
+        // 3. Preserve play state
+        if (wasPlaying) {
+          video.play().catch(() => {});
+        } else {
+          video.pause();
+        }
+      }
+
+      if (qualitySelect) {
+        qualitySelect.addEventListener('change', (e) => {
+          switchQuality(e.target.value);
         });
       }
 
@@ -2603,6 +2714,7 @@
         const url = location.protocol.startsWith('http') ? undefined : 'http://localhost:3000';
         socket = url ? ioFn(url) : ioFn();
         window._socket = socket;
+        window.socket = socket;
 
         socket.on('connect', () => {
           setConn(myRoomCode ? 'connected · room ' + myRoomCode : 'connected', '');
@@ -2749,7 +2861,10 @@
 
       function loadVideoSource(videoId) {
         if (!videoId || localMode) return;
-        const src = resolveSrc(videoId);
+        const sources = getSourcesForVideo(videoId);
+        updateQualityOptions(sources);
+        const chosen = sources.find((s) => s.quality === preferredQuality) || sources[0];
+        const src = resolveSrc(chosen ? chosen.url : videoId);
         let current = '';
         try { current = new URL(video.src, location.href).href; } catch (e) {}
         let target = '';
@@ -3201,6 +3316,10 @@
           '</span>' +
           '</div>'
         ).join('');
+
+        if (storedState && storedState.videoId) {
+          updateQualityOptions(getSourcesForVideo(storedState.videoId));
+        }
       }
 
       if (playlistEl) {

@@ -43,8 +43,8 @@ describe('SQLite Persistence & Migrations', () => {
       .get() as { v: number; name: string }
 
     expect(versionRow).toBeDefined()
-    expect(versionRow.v).toBe(1)
-    expect(versionRow.name).toBe('initial_schema')
+    expect(versionRow.v).toBe(2)
+    expect(versionRow.name).toBe('add_sources_to_playlist')
 
     // Verify all required tables exist
     const tables = (
@@ -322,6 +322,49 @@ describe('Room Restart & Full State Recovery', () => {
     expect(restored.playbackState.positionMs).toBe(45000)
     expect(restored.playbackState.serverTimestampMs).toBe(now)
     expect(restored.playbackState.rate).toBe(1.5)
+  })
+
+  it('persists and restores playlist items with multi-quality sources', () => {
+    const room: Room = {
+      id: 'room-sources',
+      code: 'SRC001',
+      hostId: 'h1',
+      everyoneCanControl: true,
+      version: 1,
+      participants: [],
+      playbackState: {
+        videoId: 'sintel.mp4',
+        status: 'paused',
+        positionMs: 0,
+        serverTimestampMs: 1000,
+        rate: 1.0,
+        version: 1,
+        playlist: [
+          {
+            id: 'item-1',
+            movieId: 'sintel.mp4',
+            title: 'Sintel Trailer',
+            addedBy: 'h1',
+            order: 0,
+            sources: [
+              { url: '/media/sintel-1080p.mp4', quality: '1080p' },
+              { url: '/media/sintel-720p.mp4', quality: '720p' },
+              { url: '/media/sintel-480p.mp4', quality: '480p' },
+            ],
+          },
+        ],
+      },
+    }
+
+    saveRoom(db, room)
+    const restored = loadAllRooms(db, 2000)
+    expect(restored.length).toBe(1)
+    expect(restored[0].playbackState.playlist.length).toBe(1)
+    const item = restored[0].playbackState.playlist[0]
+    expect(item.sources).toBeDefined()
+    expect(item.sources?.length).toBe(3)
+    expect(item.sources?.[0].quality).toBe('1080p')
+    expect(item.sources?.[1].quality).toBe('720p')
   })
 })
 

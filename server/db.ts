@@ -11,12 +11,18 @@ export type Participant = {
   subtitleOffsetMs?: number
 }
 
+export type VideoSource = {
+  url: string
+  quality: string
+}
+
 export type PlaylistItem = {
   id: string
   movieId: string
   title: string
   addedBy: string
   order: number
+  sources?: VideoSource[]
 }
 
 export type PollOption = {
@@ -166,6 +172,17 @@ const migrations: Migration[] = [
       `)
     },
   },
+  {
+    version: 2,
+    name: 'add_sources_to_playlist',
+    up: (db) => {
+      try {
+        db.exec('ALTER TABLE playlist ADD COLUMN sources TEXT')
+      } catch (e) {
+        // column may already exist
+      }
+    },
+  },
 ]
 
 export function runMigrations(db: Database.Database): void {
@@ -279,8 +296,8 @@ export function saveRoom(db: Database.Database, room: Room): void {
     // 4. Sync playlist
     db.prepare('DELETE FROM playlist WHERE room_id = ?').run(room.id)
     const insertPlaylist = db.prepare(`
-      INSERT INTO playlist (id, room_id, movie_id, title, added_by, item_order)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO playlist (id, room_id, movie_id, title, added_by, item_order, sources)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `)
     const playlist = room.playbackState.playlist || []
     playlist.forEach((item, idx) => {
@@ -290,7 +307,8 @@ export function saveRoom(db: Database.Database, room: Room): void {
         item.movieId,
         item.title,
         item.addedBy,
-        typeof item.order === 'number' ? item.order : idx
+        typeof item.order === 'number' ? item.order : idx,
+        item.sources ? JSON.stringify(item.sources) : null
       )
     })
 
@@ -445,13 +463,22 @@ export function loadAllRooms(db: Database.Database, currentTimeMs?: number): Roo
     const playlistRows = db
       .prepare('SELECT * FROM playlist WHERE room_id = ? ORDER BY item_order ASC')
       .all(r.id) as any[]
-    playbackState.playlist = playlistRows.map((p) => ({
-      id: p.id,
-      movieId: p.movie_id,
-      title: p.title,
-      addedBy: p.added_by,
-      order: p.item_order,
-    }))
+    playbackState.playlist = playlistRows.map((p) => {
+      let sources: VideoSource[] | undefined
+      if (p.sources) {
+        try {
+          sources = JSON.parse(p.sources)
+        } catch (e) {}
+      }
+      return {
+        id: p.id,
+        movieId: p.movie_id,
+        title: p.title,
+        addedBy: p.added_by,
+        order: p.item_order,
+        sources,
+      }
+    })
 
     // 3. Participants: mark disconnected & set leftAt to now if not set
     const partRows = db
