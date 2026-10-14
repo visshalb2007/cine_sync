@@ -17,6 +17,7 @@ import {
   type Participant,
   type PlaybackState,
   type PlaylistItem,
+  type VideoSource,
   type Poll,
   type PollOption,
   type ChatMessage,
@@ -26,6 +27,14 @@ loadEnv()
 
 const app = express()
 const httpServer = createServer(app)
+
+// Security headers
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff')
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN')
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
+  next()
+})
 
 // Serve the client HTML/JS so http://localhost:3000 just works.
 // Works both via tsx (server/...) and compiled output (dist/server/...).
@@ -163,7 +172,17 @@ app.get('/api/movies', movieApiLimiter, async (req, res) => {
 // Resolve bare video ids (legacy + playlist entries) to streamable URLs.
 app.get('/watch/:id', (req, res) => {
   const id = String(req.params.id ?? '')
-  if (/^https?:\/\//i.test(id)) return res.redirect(id)
+  if (/^https?:\/\//i.test(id)) {
+    try {
+      const parsed = new URL(id)
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+        if (/\.(mp4|webm|m3u8|ogv)(\?.*)?$/i.test(parsed.pathname)) {
+          return res.redirect(parsed.href)
+        }
+      }
+    } catch {}
+    return res.status(400).json({ error: 'Invalid media redirect target' })
+  }
   const sample = SAMPLES[id]
   if (sample) return res.redirect(sample.url)
   // Allow media filenames (e.g. flower.mp4) without path traversal
@@ -445,7 +464,7 @@ io.on('connection', (socket) => {
   // Join room by code. Empty code = create a new room.
   socket.on('join-room', ({ roomCode, name, sessionToken }: { roomCode: string; name: string; sessionToken?: string }) => {
     const cleanName = String(name ?? '').slice(0, 40) || 'Anonymous'
-    const wantCode = String(roomCode ?? '').trim().toUpperCase()
+    const wantCode = typeof roomCode === 'string' ? roomCode.trim().toUpperCase() : ''
     let room = wantCode ? rooms.get(wantCode) : undefined
     if (!room) {
       // Create new room: reuse a caller-supplied code when it looks valid,
@@ -800,12 +819,18 @@ io.on('connection', (socket) => {
       return
     }
 
-    if (!canControl(room, socket.id, userId)) {
+    if (!canControl(room, socket.id)) {
       socket.emit('error', { message: 'Only the host can change the video right now', clientSeq })
       return
     }
 
-    room.playbackState.videoId = String(videoId ?? '').slice(0, 500)
+    const cleanVideoId = String(videoId ?? '').slice(0, 500)
+    if (!cleanVideoId) {
+      socket.emit('error', { message: 'Invalid videoId', clientSeq })
+      return
+    }
+
+    room.playbackState.videoId = cleanVideoId
     room.playbackState.status = 'paused'
     room.playbackState.positionMs = 0
     room.playbackState.serverTimestampMs = Date.now()
@@ -876,7 +901,7 @@ io.on('connection', (socket) => {
     }
 
     // Rate limit: max 3 reactions per 15 seconds per user
-    const participant = room.participants.find((p) => p.id === userId)
+    const participant = room.participants.find((p) => p.id === socket.id)
     if (participant) {
       const now = Date.now()
       const recentReactions = (participant.reactionHistory || []).filter(
@@ -890,8 +915,8 @@ io.on('connection', (socket) => {
     }
 
     io.to(roomCode).emit('reaction', {
-      emoji,
-      userId,
+      emoji: String(emoji ?? '').slice(0, 10),
+      userId: socket.id,
       serverTimestampMs: Date.now(),
     })
   })
@@ -967,20 +992,27 @@ io.on('connection', (socket) => {
       return
     }
 
-    if (!canControl(room, socket.id, userId)) {
+    if (!canControl(room, socket.id)) {
       socket.emit('error', { message: 'Only the host can add videos right now' })
+      return
+    }
+
+    const cleanMovieId = String(movieId ?? '').slice(0, 500)
+    const cleanTitle = String(title ?? '').slice(0, 200) || 'Untitled Video'
+    if (!cleanMovieId) {
+      socket.emit('error', { message: 'Invalid video ID' })
       return
     }
 
     const normalizedSources: VideoSource[] = Array.isArray(sources) && sources.length > 0
       ? sources
-      : [{ url: movieId, quality: 'Auto' }]
+      : [{ url: cleanMovieId, quality: 'Auto' }]
 
     const newPlaylistItem: PlaylistItem = {
       id: Math.random().toString(36).substring(2, 9),
-      movieId,
-      title,
-      addedBy: userId,
+      movieId: cleanMovieId,
+      title: cleanTitle,
+      addedBy: socket.id,
       order: room.playbackState.playlist.length,
       sources: normalizedSources,
     }
@@ -1010,8 +1042,13 @@ io.on('connection', (socket) => {
       return
     }
 
-    if (!canControl(room, socket.id, userId)) {
+    if (!canControl(room, socket.id)) {
       socket.emit('error', { message: 'Only the host can remove videos right now' })
+      return
+    }
+
+    if (typeof itemId !== 'string' || !itemId) {
+      socket.emit('error', { message: 'Invalid item ID' })
       return
     }
 
@@ -1027,7 +1064,7 @@ io.on('connection', (socket) => {
     markRoomDirty(roomCode)
   })
 
-socket.on('reorder-playlist', ({ itemIds, clientSeq, baseVersion, userId }: { itemIds: string[]; clientSeq: number; baseVersion: number; userId: string }) => {
+  socket.on('reorder-playlist', ({ itemIds, clientSeq, baseVersion, userId }: { itemIds: string[]; clientSeq: number; baseVersion: number; userId: string }) => {
     const roomCode = (socket as any).roomCode
     if (!roomCode) return
 
@@ -1040,8 +1077,13 @@ socket.on('reorder-playlist', ({ itemIds, clientSeq, baseVersion, userId }: { it
       return
     }
 
-    if (!canControl(room, socket.id, userId)) {
+    if (!canControl(room, socket.id)) {
       socket.emit('error', { message: 'Only the host can reorder the playlist right now' })
+      return
+    }
+
+    if (!Array.isArray(itemIds)) {
+      socket.emit('error', { message: 'Invalid itemIds format' })
       return
     }
 
@@ -1075,10 +1117,30 @@ socket.on('reorder-playlist', ({ itemIds, clientSeq, baseVersion, userId }: { it
       return
     }
 
+    if (typeof question !== 'string' || !question.trim()) {
+      socket.emit('error', { message: 'Invalid poll question' })
+      return
+    }
+
+    if (!Array.isArray(options) || options.length < 2) {
+      socket.emit('error', { message: 'Poll must have at least 2 options' })
+      return
+    }
+
+    const cleanQuestion = question.trim().slice(0, 300)
+    const cleanOptions = options
+      .map((opt) => String(opt ?? '').trim().slice(0, 200))
+      .filter((opt) => opt.length > 0)
+
+    if (cleanOptions.length < 2) {
+      socket.emit('error', { message: 'Poll must have at least 2 valid options' })
+      return
+    }
+
     const poll: Poll = {
       id: Math.random().toString(36).substring(2, 9),
-      question,
-      options: options.map((opt) => ({ id: Math.random().toString(36).substring(2, 6), text: opt, votes: [] })),
+      question: cleanQuestion,
+      options: cleanOptions.map((opt) => ({ id: Math.random().toString(36).substring(2, 6), text: opt, votes: [] })),
       votes: {},
       status: 'open',
       closesAt: addWinnerToPlaylist ? Date.now() + 60000 : undefined, // close after 1 min if adding to playlist
@@ -1097,7 +1159,7 @@ socket.on('reorder-playlist', ({ itemIds, clientSeq, baseVersion, userId }: { it
     })
   })
 
-  socket.on('vote-poll', ({ pollId, optionId, clientSeq, baseVersion, userId }: { pollId: string; optionId: string; clientSeq: number; baseVersion: number; userId: string }) => {
+  socket.on('vote-poll', ({ pollId, optionId, clientSeq, baseVersion }: { pollId: string; optionId: string; clientSeq: number; baseVersion: number; userId?: string }) => {
     const roomCode = (socket as any).roomCode
     if (!roomCode) return
 
@@ -1110,18 +1172,27 @@ socket.on('reorder-playlist', ({ itemIds, clientSeq, baseVersion, userId }: { it
       return
     }
 
+    if (typeof pollId !== 'string' || typeof optionId !== 'string') return
+
     const poll = (room.polls || []).find((p) => p.id === pollId) || (room.activePoll?.id === pollId ? room.activePoll : null)
-    if (poll) {
-      poll.votes = poll.votes || {}
-      poll.votes[userId] = optionId
-      markRoomDirty(roomCode)
+    if (poll && poll.status === 'open') {
+      const validOption = poll.options.some((opt) => opt.id === optionId)
+      if (validOption) {
+        poll.votes = poll.votes || {}
+        // Guard against prototype pollution and use authoritative socket.id
+        const voterId = socket.id
+        if (voterId && voterId !== '__proto__' && voterId !== 'constructor' && voterId !== 'prototype') {
+          poll.votes[voterId] = optionId
+          markRoomDirty(roomCode)
+        }
+      }
     }
 
     io.to(roomCode).emit('poll-update', {
       type: 'vote',
       pollId,
       optionId,
-      userId,
+      userId: socket.id,
     })
   })
 
@@ -1138,7 +1209,7 @@ socket.on('reorder-playlist', ({ itemIds, clientSeq, baseVersion, userId }: { it
       return
     }
 
-    if (!canControl(room, socket.id, userId)) {
+    if (!canControl(room, socket.id)) {
       socket.emit('error', { message: 'Only the host can close polls right now' })
       return
     }
@@ -1166,7 +1237,7 @@ socket.on('reorder-playlist', ({ itemIds, clientSeq, baseVersion, userId }: { it
     const room = rooms.get(roomCode)
     if (!room) return
 
-    if (!isHost(room, socket.id, userId)) {
+    if (!isHost(room, socket.id)) {
       socket.emit('error', { message: 'Only the host can change room controls' })
       return
     }
@@ -1187,7 +1258,7 @@ socket.on('reorder-playlist', ({ itemIds, clientSeq, baseVersion, userId }: { it
     const room = rooms.get(roomCode)
     if (!room) return
 
-    if (!isHost(room, socket.id, userId)) {
+    if (!isHost(room, socket.id)) {
       socket.emit('error', { message: 'Only the host can transfer host controls' })
       return
     }
