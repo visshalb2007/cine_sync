@@ -8,6 +8,7 @@ export type Participant = {
   joinedAt: number
   leftAt?: number
   reactionHistory?: number[]
+  subtitleOffsetMs?: number
 }
 
 export type PlaylistItem = {

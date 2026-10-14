@@ -896,6 +896,24 @@ io.on('connection', (socket) => {
     })
   })
 
+  // Per-user subtitle offset
+  socket.on('subtitle-offset', ({ offsetMs }: { offsetMs: number }) => {
+    const roomCode = (socket as any).roomCode
+    if (!roomCode) return
+    const room = rooms.get(roomCode)
+    if (!room) return
+
+    if (typeof offsetMs !== 'number' || !isFinite(offsetMs)) return
+    const clampedOffset = Math.max(-30000, Math.min(30000, Math.round(offsetMs)))
+
+    const participant = room.participants.find((p) => p.id === socket.id)
+    if (participant) {
+      participant.subtitleOffsetMs = clampedOffset
+    }
+
+    socket.emit('subtitle-offset-ack', { offsetMs: clampedOffset })
+  })
+
   socket.on('chat-message', ({ text, clientSeq, baseVersion, userId }: { text: string; clientSeq: number; baseVersion: number; userId: string }) => {
     const roomCode = (socket as any).roomCode
     if (!roomCode) return

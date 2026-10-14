@@ -1043,6 +1043,46 @@
         font-size: 11px;
       }
 
+      /* Subtitle Offset Control */
+      .subtitle-offset-wrap {
+        display: flex;
+        align-items: center;
+        gap: 3px;
+        background: #141414;
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-sm);
+        padding: 2px 6px;
+        font-size: 11px;
+        color: var(--text-secondary);
+      }
+      .btn-sub-step, .btn-sub-reset {
+        background: #1E1E1E;
+        border: 1px solid var(--border-subtle);
+        color: var(--text-primary);
+        border-radius: 4px;
+        width: 20px;
+        height: 20px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 700;
+        transition: background 0.15s;
+        padding: 0;
+      }
+      .btn-sub-step:hover, .btn-sub-reset:hover {
+        background: #2E2E2E;
+      }
+      .sub-offset-val {
+        font-family: monospace;
+        font-size: 11px;
+        color: var(--text-primary);
+        min-width: 44px;
+        text-align: center;
+        font-weight: 600;
+      }
+
       .volume-group {
         display: flex;
         align-items: center;
@@ -1958,6 +1998,15 @@
               <!-- Flexible Space -->
               <div class="controls-flex-spacer"></div>
 
+              <!-- Subtitle Offset Control -->
+              <div class="subtitle-offset-wrap" data-testid="subtitle-offset-control" title="Adjust Subtitle Offset (±100ms)">
+                <span>Sub:</span>
+                <button type="button" class="btn-sub-step" id="subOffsetMinusBtn" data-testid="sub-offset-minus" aria-label="Decrease subtitle offset by 100ms" title="-100ms">-</button>
+                <span id="subOffsetDisplay" data-testid="sub-offset-display" class="sub-offset-val">0ms</span>
+                <button type="button" class="btn-sub-step" id="subOffsetPlusBtn" data-testid="sub-offset-plus" aria-label="Increase subtitle offset by 100ms" title="+100ms">+</button>
+                <button type="button" class="btn-sub-reset" id="subOffsetResetBtn" data-testid="sub-offset-reset" aria-label="Reset subtitle offset to 0ms" title="Reset offset">↺</button>
+              </div>
+
               <!-- Sync & Drift Stats -->
               <div class="sync-status-group">
                 <span class="status status-drift ok" id="driftLabel" data-testid="drift-label">drift: 0ms</span>
@@ -2061,6 +2110,7 @@
       const roomCodeEl = $('roomCode'), roomCodeCopyBtn = roomCodeEl?.querySelector('.copy-btn');
       const watchTogetherBtn = $('watchTogetherBtn'), inviteModal = $('inviteModal'), closeInviteModalBtn = $('closeInviteModalBtn');
       const copyInviteLinkBtn = $('copyInviteLinkBtn'), inviteLinkInput = $('inviteLinkInput'), inviteQrCanvas = $('inviteQrCanvas'), inviteShareNotice = $('inviteShareNotice');
+      const subOffsetMinusBtn = $('subOffsetMinusBtn'), subOffsetPlusBtn = $('subOffsetPlusBtn'), subOffsetResetBtn = $('subOffsetResetBtn'), subOffsetDisplay = $('subOffsetDisplay');
       const roomSectionToggle = $('roomSectionToggle'), roomSectionContent = $('roomSectionContent'), roomChevron = $('roomChevron');
       const participantsEl = $('participants'), connStatus = $('connStatus'), connDot = $('connDot'), watchCount = $('watchCount');
       const controlToggle = $('controlToggle'), controlNote = $('controlNote');
@@ -2118,6 +2168,75 @@
         configurable: true
       });
       let isSeeking = false;
+      let localSubtitleOffsetMs = 0;
+      Object.defineProperty(window, '__subtitleOffsetMs', {
+        get: () => localSubtitleOffsetMs,
+        set: (v) => { localSubtitleOffsetMs = v; updateSubtitleOffsetUI(); },
+        configurable: true
+      });
+
+      function updateSubtitleOffsetUI() {
+        if (subOffsetDisplay) {
+          subOffsetDisplay.textContent = (localSubtitleOffsetMs > 0 ? '+' : '') + localSubtitleOffsetMs + 'ms';
+        }
+      }
+
+      function changeSubtitleOffset(deltaMs) {
+        localSubtitleOffsetMs = Math.max(-30000, Math.min(30000, localSubtitleOffsetMs + deltaMs));
+        updateSubtitleOffsetUI();
+        if (myRoomCode) {
+          try {
+            sessionStorage.setItem('cinesync_sub_offset_' + myRoomCode, String(localSubtitleOffsetMs));
+          } catch (e) {}
+        }
+        if (socket && socket.connected) {
+          socket.emit('subtitle-offset', { offsetMs: localSubtitleOffsetMs });
+        }
+      }
+
+      function restoreSubtitleOffset(participants) {
+        if (socket) {
+          const me = (participants || []).find((p) => p.id === socket.id);
+          if (me && typeof me.subtitleOffsetMs === 'number') {
+            localSubtitleOffsetMs = me.subtitleOffsetMs;
+            updateSubtitleOffsetUI();
+            return;
+          }
+        }
+        if (myRoomCode) {
+          try {
+            const saved = sessionStorage.getItem('cinesync_sub_offset_' + myRoomCode);
+            if (saved !== null) {
+              localSubtitleOffsetMs = parseInt(saved, 10) || 0;
+              updateSubtitleOffsetUI();
+              if (socket && socket.connected && localSubtitleOffsetMs !== 0) {
+                socket.emit('subtitle-offset', { offsetMs: localSubtitleOffsetMs });
+              }
+            }
+          } catch (e) {}
+        }
+      }
+
+      if (subOffsetPlusBtn) {
+        subOffsetPlusBtn.addEventListener('click', () => changeSubtitleOffset(100));
+      }
+      if (subOffsetMinusBtn) {
+        subOffsetMinusBtn.addEventListener('click', () => changeSubtitleOffset(-100));
+      }
+      if (subOffsetResetBtn) {
+        subOffsetResetBtn.addEventListener('click', () => {
+          localSubtitleOffsetMs = 0;
+          updateSubtitleOffsetUI();
+          if (myRoomCode) {
+            try {
+              sessionStorage.setItem('cinesync_sub_offset_' + myRoomCode, '0');
+            } catch (e) {}
+          }
+          if (socket && socket.connected) {
+            socket.emit('subtitle-offset', { offsetMs: 0 });
+          }
+        });
+      }
 
       const SAMPLES = {
         flower: '/media/flower.mp4',
@@ -2523,6 +2642,13 @@
           if (clockLabel) clockLabel.textContent = 'sync: ' + Math.round(clockOffset) + 'ms';
         });
 
+        socket.on('subtitle-offset-ack', (data) => {
+          if (data && typeof data.offsetMs === 'number') {
+            localSubtitleOffsetMs = data.offsetMs;
+            updateSubtitleOffsetUI();
+          }
+        });
+
         socket.on('room-snapshot', onSnapshot);
         socket.on('room-snapshot-resume', onSnapshot);
 
@@ -2718,6 +2844,7 @@
           (data.chatMessages || []).forEach((m) => addChat(m.name, m.text, false, false));
         }
         applyState(data.playbackState, true);
+        restoreSubtitleOffset(data.participants || []);
         setConn('connected · room ' + myRoomCode, '');
       }
 
