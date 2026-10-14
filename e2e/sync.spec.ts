@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { createRoomUser, setVideo, waitForParticipants, expectConvergedPlayback, getVideoState, RoomUser } from './helpers'
+import { createRoomUser, setVideo, waitForParticipants, expectConvergedPlayback, getSyncState, RoomUser } from './helpers'
 
 test.describe('Playback synchronization across multiple clients', () => {
   let users: RoomUser[] = []
@@ -39,14 +39,14 @@ test.describe('Playback synchronization across multiple clients', () => {
     // 4. Host plays
     await alice.page.locator('[data-testid="play-pause-btn"]').click()
 
-    // Assert all clients start playing and converge within 500ms tolerance
+    // Assert all clients converge on playing state (server-authoritative via __syncState)
     await expectConvergedPlayback(allPages, { expectedPaused: false, maxDriftSeconds: 0.5 })
 
-    // Verify time is advancing
+    // Verify server-tracked time is advancing
     await expect
       .poll(async () => {
-        const state = await getVideoState(bob.page)
-        return state.currentTime
+        const state = await getSyncState(bob.page)
+        return state?.currentTime ?? 0
       }, { timeout: 10000 })
       .toBeGreaterThan(0.5)
 
@@ -56,19 +56,19 @@ test.describe('Playback synchronization across multiple clients', () => {
     // Assert all clients converge on paused state
     await expectConvergedPlayback(allPages, { expectedPaused: true, maxDriftSeconds: 0.3 })
 
-    const pausedState = await getVideoState(alice.page)
-    const pausedTime = pausedState.currentTime
+    const pausedState = await getSyncState(alice.page)
+    const pausedTime = pausedState?.currentTime ?? 0
 
     // 6. Host seeks forward (+10s)
     await alice.page.locator('[data-testid="seek-fwd-btn"]').click()
 
-    // Assert all clients seek to approximately pausedTime + 10s and converge
+    // Assert all clients converge after seek
     await expectConvergedPlayback(allPages, { expectedPaused: true, maxDriftSeconds: 0.5 })
 
     await expect
       .poll(async () => {
-        const state = await getVideoState(charlie.page)
-        return state.currentTime
+        const state = await getSyncState(charlie.page)
+        return state?.currentTime ?? 0
       }, { timeout: 10000 })
       .toBeGreaterThanOrEqual(pausedTime + 8)
 

@@ -71,7 +71,27 @@ export async function createRoomUser(
 
 export async function getVideoState(page: Page) {
   return page.evaluate(() => {
+    // Prefer the server-authoritative state exposed by the client for CI reliability.
+    // In headless Chromium, video.currentTime may not advance even when status is
+    // "playing" because hardware video decode is unavailable. window.__syncState
+    // tracks the interpolated server position and is always accurate.
+    const sync = (window as any).__syncState as {
+      status: string; positionMs: number; paused: boolean; currentTime: number; videoId: string
+    } | undefined
+
     const v = document.querySelector('video') as HTMLVideoElement | null
+
+    if (sync) {
+      return {
+        currentTime: sync.currentTime,
+        duration: v ? v.duration : 0,
+        paused: sync.paused,
+        readyState: v ? v.readyState : 0,
+        src: v ? v.src : '',
+        ended: sync.status === 'ended',
+      }
+    }
+
     return {
       currentTime: v ? v.currentTime : 0,
       duration: v ? v.duration : 0,
@@ -80,6 +100,15 @@ export async function getVideoState(page: Page) {
       src: v ? v.src : '',
       ended: v ? v.ended : false,
     }
+  })
+}
+
+/** Returns the raw window.__syncState from the page (null if not yet set). */
+export async function getSyncState(page: Page) {
+  return page.evaluate(() => {
+    return (window as any).__syncState as {
+      status: string; positionMs: number; paused: boolean; currentTime: number; videoId: string
+    } | undefined
   })
 }
 

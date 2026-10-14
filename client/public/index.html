@@ -1973,6 +1973,25 @@
       let lastDriftAbs = 0, consecutiveBeyond = 0;
       let activePoll = null;
       let localMode = false;
+      // Expose mutable references for Playwright E2E tests to emit socket events directly.
+      // Wrapped in a getter so tests always see the current value even after reassignment.
+      Object.defineProperty(window, '__clientSeq', { get: () => clientSeq, set: (v) => { clientSeq = v; }, configurable: true });
+      Object.defineProperty(window, '__baseVersion', { get: () => baseVersion, configurable: true });
+      Object.defineProperty(window, '__socket', { get: () => socket, configurable: true });
+      Object.defineProperty(window, '__syncState', {
+        get: () => {
+          if (!storedState) return null;
+          const pos = typeof expectedPosition === 'function' ? expectedPosition() : (storedState.positionMs || 0);
+          return {
+            status: storedState.status,
+            positionMs: pos,
+            paused: storedState.status !== 'playing',
+            currentTime: pos / 1000,
+            videoId: storedState.videoId || '',
+          };
+        },
+        configurable: true
+      });
       let isSeeking = false;
 
       const SAMPLES = {
@@ -3126,9 +3145,10 @@
           try { video.currentTime = 0; } catch (e) {}
         } else {
           want = storedState.status === 'playing' ? 'paused' : 'playing';
-          posMs = isFinite(video.currentTime) && video.currentTime >= 0
-            ? Math.round(video.currentTime * 1000)
-            : (storedState ? storedState.positionMs : 0);
+          const expPos = expectedPosition();
+          posMs = isFinite(video.currentTime) && video.currentTime > 0
+            ? Math.round(Math.max(video.currentTime * 1000, expPos))
+            : Math.round(expPos);
         }
 
         isPlaying = want === 'playing';
@@ -3155,18 +3175,30 @@
       // Seek -10s / +10s
       if (seekFwdBtn) {
         seekFwdBtn.addEventListener('click', () => {
-          if (!joined || !isFinite(video.duration)) return;
-          video.currentTime = Math.min(video.currentTime + 10, video.duration || video.currentTime + 10);
+          if (!joined) return;
+          const expPos = expectedPosition();
+          const curTime = isFinite(video.currentTime) && video.currentTime > 0
+            ? Math.max(video.currentTime, expPos / 1000)
+            : expPos / 1000;
+          const nextTime = isFinite(video.duration) && video.duration > 0
+            ? Math.min(curTime + 10, video.duration)
+            : curTime + 10;
+          try { video.currentTime = nextTime; } catch (e) {}
           clientSeq++;
-          socket.emit('seek', { positionMs: Math.round(video.currentTime * 1000), clientSeq, baseVersion });
+          socket.emit('seek', { positionMs: Math.round(nextTime * 1000), clientSeq, baseVersion });
         });
       }
       if (seekBackBtn) {
         seekBackBtn.addEventListener('click', () => {
           if (!joined) return;
-          video.currentTime = Math.max(video.currentTime - 10, 0);
+          const expPos = expectedPosition();
+          const curTime = isFinite(video.currentTime) && video.currentTime > 0
+            ? Math.max(video.currentTime, expPos / 1000)
+            : expPos / 1000;
+          const nextTime = Math.max(curTime - 10, 0);
+          try { video.currentTime = nextTime; } catch (e) {}
           clientSeq++;
-          socket.emit('seek', { positionMs: Math.round(video.currentTime * 1000), clientSeq, baseVersion });
+          socket.emit('seek', { positionMs: Math.round(nextTime * 1000), clientSeq, baseVersion });
         });
       }
 

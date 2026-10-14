@@ -21,13 +21,16 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
     launchOptions: {
-      args: [
-        '--autoplay-policy=no-user-gesture-required',
-        '--use-fake-ui-for-media-stream',
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-      ],
-    },
+        args: [
+          '--autoplay-policy=no-user-gesture-required',
+          '--use-fake-ui-for-media-stream',
+          '--use-fake-device-for-media-stream',
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--mute-audio',
+        ],
+      },
   },
   webServer: {
     command: 'npx tsx server/index.ts',

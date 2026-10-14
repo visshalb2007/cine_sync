@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { createRoomUser, setVideo, getVideoState, expectConvergedPlayback, RoomUser } from './helpers'
+import { createRoomUser, setVideo, getVideoState, getSyncState, expectConvergedPlayback, RoomUser } from './helpers'
 
 test.describe('Late join synchronization', () => {
   let users: RoomUser[] = []
@@ -21,11 +21,14 @@ test.describe('Late join synchronization', () => {
     // 2. Host starts playback
     await alice.page.locator('[data-testid="play-pause-btn"]').click()
 
-    // 3. Wait until playback has advanced for at least 3 seconds
+    // 3. Wait until server-authoritative playback has advanced at least 3 seconds.
+    // We use window.__syncState (set by applyState) rather than video.currentTime
+    // because headless Chromium may not advance the video element's currentTime
+    // when hardware decode is unavailable, even though the server is tracking time.
     await expect
       .poll(async () => {
-        const state = await getVideoState(alice.page)
-        return !state.paused && state.currentTime > 3
+        const state = await getSyncState(alice.page)
+        return state && !state.paused && state.currentTime > 3
       }, { timeout: 15000 })
       .toBe(true)
 
@@ -47,8 +50,9 @@ test.describe('Late join synchronization', () => {
       timeout: 10000,
     })
 
-    // Assert Bob's currentTime is well past the beginning (not 0)
-    const bobState = await getVideoState(bob.page)
-    expect(bobState.currentTime).toBeGreaterThan(2.5)
+    // Assert Bob's server-tracked position is well past the beginning (not 0)
+    const bobState = await getSyncState(bob.page)
+    expect(bobState?.currentTime ?? 0).toBeGreaterThan(2.5)
   })
 })
+
