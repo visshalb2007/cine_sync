@@ -189,7 +189,29 @@ const io = new Server(httpServer, {
 
 const PORT = process.env.PORT || 3000
 
-export const db = createDatabase()
+let _db: ReturnType<typeof createDatabase> | null = null
+
+export function getServerDb(): ReturnType<typeof createDatabase> {
+  if (!_db) {
+    _db = createDatabase()
+  }
+  return _db
+}
+
+export function resetServerDbForTests(): void {
+  if (_db) {
+    try {
+      _db.close()
+    } catch (e) {}
+    _db = null
+  }
+}
+
+export const db: ReturnType<typeof createDatabase> = new Proxy({} as ReturnType<typeof createDatabase>, {
+  get(_target, prop, receiver) {
+    return Reflect.get(getServerDb(), prop, receiver)
+  },
+})
 export const rooms = new Map<string, Room>()
 export const dirtyRooms = new Set<string>()
 let saveDebounceTimer: NodeJS.Timeout | null = null
@@ -319,28 +341,33 @@ export function initRoomsFromDb(): void {
   }
 }
 
-// Restore rooms on boot
-initRoomsFromDb()
+// Restore rooms on boot & background intervals (only when not in test runner)
+if (!process.env.VITEST) {
+  initRoomsFromDb()
 
-// Periodic snapshot every 5s for dirty rooms only
-const snapshotInterval = setInterval(() => {
-  if (dirtyRooms.size > 0) {
-    flushDirtyRooms()
-  }
-}, 5000)
-snapshotInterval.unref()
+  // Periodic snapshot every 5s for dirty rooms only
+  const snapshotInterval = setInterval(() => {
+    if (dirtyRooms.size > 0) {
+      flushDirtyRooms()
+    }
+  }, 5000)
+  snapshotInterval.unref()
 
-// Hourly TTL cleanup
-const ttlInterval = setInterval(() => {
-  runTtlCleanup()
-}, 60 * 60 * 1000)
-ttlInterval.unref()
+  // Hourly TTL cleanup
+  const ttlInterval = setInterval(() => {
+    runTtlCleanup()
+  }, 60 * 60 * 1000)
+  ttlInterval.unref()
+}
 
 export function handleShutdown(signal: string): void {
   console.log(`Received ${signal}, flushing dirty rooms and closing database...`)
   try {
     flushDirtyRoomsSync()
-    db.close()
+    if (_db) {
+      _db.close()
+      _db = null
+    }
     console.log('Database closed.')
   } catch (err) {
     console.error('Error during shutdown:', err)

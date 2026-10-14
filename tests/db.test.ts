@@ -22,6 +22,7 @@ import {
   flushDirtyRoomsSync,
   runTtlCleanup,
   db as serverDb,
+  resetServerDbForTests,
 } from '../server/index'
 
 describe('SQLite Persistence & Migrations', () => {
@@ -33,6 +34,7 @@ describe('SQLite Persistence & Migrations', () => {
 
   afterEach(() => {
     db.close()
+    resetServerDbForTests()
   })
 
   it('applies migrations and creates schema_version table and all required tables', () => {
