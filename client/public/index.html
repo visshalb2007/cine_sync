@@ -1796,6 +1796,55 @@
       </div>
     </div>
 
+    <!-- Keyboard Shortcuts Help Modal -->
+    <div id="shortcutsModal" data-testid="shortcuts-modal" class="modal-backdrop" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="shortcutsModalTitle">
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <h2 id="shortcutsModalTitle" class="modal-title">Keyboard Shortcuts</h2>
+          <button type="button" class="modal-close-btn" id="closeShortcutsModalBtn" data-testid="close-shortcuts-modal-btn" aria-label="Close shortcuts modal">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+        <div class="modal-body" style="gap: 10px;">
+          <p style="color: var(--text-secondary); font-size: 13px; margin: 0 0 6px 0;">Control playback and interface features using these hotkeys:</p>
+          <div class="shortcuts-list" style="display: flex; flex-direction: column; gap: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border-subtle);">
+              <span style="font-size: 14px; color: var(--text-primary);">Play / Pause</span>
+              <kbd style="background: #262626; border: 1px solid #404040; border-radius: 4px; padding: 2px 8px; font-family: monospace; font-size: 12px; color: #FFF;">Space</kbd>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border-subtle);">
+              <span style="font-size: 14px; color: var(--text-primary);">Rewind 10 seconds</span>
+              <kbd style="background: #262626; border: 1px solid #404040; border-radius: 4px; padding: 2px 8px; font-family: monospace; font-size: 12px; color: #FFF;">←</kbd>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border-subtle);">
+              <span style="font-size: 14px; color: var(--text-primary);">Forward 10 seconds</span>
+              <kbd style="background: #262626; border: 1px solid #404040; border-radius: 4px; padding: 2px 8px; font-family: monospace; font-size: 12px; color: #FFF;">→</kbd>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border-subtle);">
+              <span style="font-size: 14px; color: var(--text-primary);">Toggle Fullscreen</span>
+              <kbd style="background: #262626; border: 1px solid #404040; border-radius: 4px; padding: 2px 8px; font-family: monospace; font-size: 12px; color: #FFF;">F</kbd>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border-subtle);">
+              <span style="font-size: 14px; color: var(--text-primary);">Mute / Unmute</span>
+              <kbd style="background: #262626; border: 1px solid #404040; border-radius: 4px; padding: 2px 8px; font-family: monospace; font-size: 12px; color: #FFF;">M</kbd>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border-subtle);">
+              <span style="font-size: 14px; color: var(--text-primary);">Toggle Cinema Mode</span>
+              <kbd style="background: #262626; border: 1px solid #404040; border-radius: 4px; padding: 2px 8px; font-family: monospace; font-size: 12px; color: #FFF;">C</kbd>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border-subtle);">
+              <span style="font-size: 14px; color: var(--text-primary);">Shortcuts Help</span>
+              <kbd style="background: #262626; border: 1px solid #404040; border-radius: 4px; padding: 2px 8px; font-family: monospace; font-size: 12px; color: #FFF;">?</kbd>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0;">
+              <span style="font-size: 14px; color: var(--text-primary);">Close Dialog / Exit Cinema</span>
+              <kbd style="background: #262626; border: 1px solid #404040; border-radius: 4px; padding: 2px 8px; font-family: monospace; font-size: 12px; color: #FFF;">Esc</kbd>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Top Navigation Bar -->
     <header class="top-navbar">
       <div class="nav-left">
@@ -2160,7 +2209,7 @@
               </button>
 
               <!-- Settings Icon -->
-              <button type="button" class="btn-settings" id="settingsBtn" title="Settings" aria-label="Settings">
+              <button type="button" class="btn-settings" id="settingsBtn" data-testid="settings-btn" title="Settings & Shortcuts (?)" aria-label="Settings and Keyboard Shortcuts" aria-haspopup="dialog">
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <circle cx="12" cy="12" r="3"></circle>
                   <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
@@ -3965,15 +4014,33 @@
           showError('CineSync strictly adheres to the monochrome dark aesthetic.');
         });
       }
+      // Keyboard Shortcuts Help Modal
+      const shortcutsModal = $('shortcutsModal');
+      const closeShortcutsModalBtn = $('closeShortcutsModalBtn');
+
+      function openShortcutsModal() {
+        if (!shortcutsModal) return;
+        openModal(shortcutsModal, closeShortcutsModalBtn);
+      }
+
+      function closeShortcutsModal() {
+        if (!shortcutsModal) return;
+        closeModal(shortcutsModal);
+      }
+
+      window.__openShortcutsModal = openShortcutsModal;
+      window.__closeShortcutsModal = closeShortcutsModal;
+
       if (settingsBtn) {
-        settingsBtn.addEventListener('click', () => {
-          showError('Keyboard shortcuts: Space = Play/Pause, ← / → = Seek 10s.');
-        });
+        settingsBtn.addEventListener('click', openShortcutsModal);
+      }
+      if (closeShortcutsModalBtn) {
+        closeShortcutsModalBtn.addEventListener('click', closeShortcutsModal);
       }
 
       // Global Keyboard Shortcuts
       window.addEventListener('keydown', (e) => {
-        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable)) return;
+        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT' || e.target.isContentEditable)) return;
 
         // Escape exits cinema mode
         if (e.key === 'Escape' && document.body.classList.contains('cinema-mode')) {
@@ -3999,6 +4066,19 @@
         } else if (e.key === 'c' || e.key === 'C') {
           e.preventDefault();
           toggleCinemaMode();
+        } else if (e.key === 'f' || e.key === 'F') {
+          e.preventDefault();
+          fullscreenBtn?.click();
+        } else if (e.key === 'm' || e.key === 'M') {
+          e.preventDefault();
+          volBtn?.click();
+        } else if (e.key === '?') {
+          e.preventDefault();
+          if (shortcutsModal && shortcutsModal.style.display !== 'none') {
+            closeShortcutsModal();
+          } else {
+            openShortcutsModal();
+          }
         }
       });
 
