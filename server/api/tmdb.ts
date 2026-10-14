@@ -110,7 +110,7 @@ export async function getTmdbGenres(): Promise<GenreItem[]> {
   const url = `${baseUrl}/genre/movie/list?api_key=${apiKey}`
 
   try {
-    const res = await fetch(url)
+    const res = await fetch(url, { signal: AbortSignal.timeout(1500) })
     if (!res.ok) throw new Error(`TMDB genre fetch failed with status: ${res.status}`)
     const data = (await res.json()) as any
     if (data && Array.isArray(data.genres)) {
@@ -144,7 +144,7 @@ export async function searchTmdb(params: SearchParams): Promise<MovieListResult>
     url += `&primary_release_year=${params.year}`
   }
 
-  const res = await fetch(url)
+  const res = await fetch(url, { signal: AbortSignal.timeout(1500) })
   if (!res.ok) {
     throw new Error(`TMDB search failed with status: ${res.status}`)
   }
@@ -209,7 +209,7 @@ export async function getMoviesTmdb(params: DiscoverParams): Promise<MovieListRe
     url += `&with_genres=${genreId}`
   }
 
-  const res = await fetch(url)
+  const res = await fetch(url, { signal: AbortSignal.timeout(1500) })
   if (!res.ok) {
     throw new Error(`TMDB discover failed with status: ${res.status}`)
   }

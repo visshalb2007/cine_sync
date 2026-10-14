@@ -83,7 +83,7 @@ export async function getOmdbMovieDetail(imdbId: string): Promise<any | null> {
   const url = `${baseUrl}/?apikey=${apiKey}&i=${encodeURIComponent(imdbId)}&plot=short`
 
   try {
-    const res = await fetch(url)
+    const res = await fetch(url, { signal: AbortSignal.timeout(1500) })
     if (!res.ok) return null
     const data = (await res.json()) as any
     if (data && data.Response !== 'False') {
@@ -113,7 +113,7 @@ export async function searchOmdb(params: SearchParams): Promise<MovieListResult>
     url += `&y=${params.year}`
   }
 
-  const res = await fetch(url)
+  const res = await fetch(url, { signal: AbortSignal.timeout(1500) })
   if (!res.ok) {
     throw new Error(`OMDb search failed with status: ${res.status}`)
   }
