@@ -66,4 +66,37 @@ test.describe('Client reconnection and grace period', () => {
     await expect(alice.page.locator('[data-testid="participant-row"]').filter({ hasText: 'Charlie' })).toBeVisible()
     await expect(charlie.page.locator('[data-testid="participant-row"]').filter({ hasText: 'Charlie' }).locator('[data-testid="badge-you"]')).toBeVisible()
   })
+
+  test('participant count does not increase beyond actual participants when disconnecting and rejoining', async ({ browser }) => {
+    // 1. Alice creates the room
+    const alice = await createRoomUser(browser, 'Alice')
+    users.push(alice)
+
+    // Initial participant count should be 1
+    await expect(alice.page.locator('[data-testid="participant-row"]')).toHaveCount(1)
+    await expect(alice.page.locator('[data-testid="participant-count"]')).toHaveText('1')
+
+    // 2. Bob joins the room
+    const bob = await createRoomUser(browser, 'Bob', { roomCode: alice.roomCode })
+    users.push(bob)
+
+    await waitForParticipants([alice.page, bob.page], 2)
+    await expect(alice.page.locator('[data-testid="participant-count"]')).toHaveText('2')
+
+    // 3. Bob disconnects (leaves by closing context)
+    await bob.context.close()
+    users = users.filter((u) => u !== bob)
+
+    // Online count badge on Alice's page reflects 1
+    await expect(alice.page.locator('[data-testid="participant-count"]')).toHaveText('1', { timeout: 8000 })
+
+    // 4. Bob rejoins the same room
+    const bobRejoined = await createRoomUser(browser, 'Bob', { roomCode: alice.roomCode })
+    users.push(bobRejoined)
+
+    // Crucial check: count must be 2, NOT 3 or more
+    await waitForParticipants([alice.page, bobRejoined.page], 2)
+    await expect(alice.page.locator('[data-testid="participant-count"]')).toHaveText('2')
+    await expect(alice.page.locator('[data-testid="participant-row"]')).toHaveCount(2)
+  })
 })

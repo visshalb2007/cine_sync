@@ -451,61 +451,127 @@ io.on('connection', (socket) => {
       console.log('Created new room:', code)
     }
 
-    // Check if this is a reconnection with existing session
-    const existingParticipant = room.participants.find(
-      (p) => p.id === socket.id || (sessionToken && p.id === sessionToken) || (!p.connected && p.name === cleanName)
-    )
+    const token = sessionToken || socket.id
 
-    if (existingParticipant && existingParticipant.leftAt) {
-      // Reconnect within grace period
-      const timeSinceLeft = Date.now() - existingParticipant.leftAt
-      if (timeSinceLeft < gracePeriod) {
+    // 1. Check if this exact socket is already registered in the room
+    const sameSocket = room.participants.find((p) => p.id === socket.id)
+    if (sameSocket) {
+      sameSocket.name = cleanName
+      sameSocket.connected = true
+      sameSocket.leftAt = undefined
+      if (sessionToken) (sameSocket as any).sessionToken = sessionToken
+
+      if (room.hostId === null) {
+        room.hostId = socket.id
+      }
+      markRoomDirty(room.code)
+      socket.join(room.code)
+      ;(socket as any).roomCode = room.code
+      ;(socket as any).sessionToken = token
+
+      io.to(room.code).emit('participants-update', roomInfo(room))
+      socket.emit('room-snapshot', {
+        ...roomInfo(room),
+        playbackState: room.playbackState,
+        playlist: room.playbackState.playlist,
+        activePoll: room.activePoll || null,
+        chatMessages: room.chatMessages || [],
+      })
+      return
+    }
+
+    // 2. Check if this is a reconnection of an existing session or disconnected participant with same name
+    const existingParticipant = room.participants.find((p) => {
+      if (sessionToken && ((p as any).sessionToken === sessionToken || p.id === sessionToken)) {
+        return true
+      }
+      if (!p.connected) {
+        if (sessionToken && p.id === sessionToken) return true
+        if (cleanName.toLowerCase() !== 'anonymous' && p.name.toLowerCase() === cleanName.toLowerCase()) {
+          return true
+        }
+      }
+      return false
+    })
+
+    if (existingParticipant) {
+      const timeSinceLeft = existingParticipant.leftAt ? Date.now() - existingParticipant.leftAt : 0
+      const isWithinGrace = !existingParticipant.leftAt || timeSinceLeft < gracePeriod
+
+      if (isWithinGrace) {
         // Restore participant
+        const oldId = existingParticipant.id
         existingParticipant.id = socket.id
+        existingParticipant.name = cleanName
         existingParticipant.connected = true
         existingParticipant.leftAt = undefined
-        existingParticipant.joinedAt = Date.now() - (existingParticipant.joinedAt - (existingParticipant.leftAt ? existingParticipant.leftAt - existingParticipant.joinedAt : 0))
+        if (sessionToken) (existingParticipant as any).sessionToken = sessionToken
 
-        if (room.hostId === null || room.hostId === existingParticipant.id) {
+        if (room.hostId === null || room.hostId === oldId) {
           room.hostId = socket.id
         }
+
+        // Clean up any other duplicate entries in room.participants
+        room.participants = room.participants.filter(
+          (p) =>
+            p === existingParticipant ||
+            (p.id !== socket.id &&
+              (!sessionToken || (p as any).sessionToken !== sessionToken) &&
+              (p.connected || p.name.toLowerCase() !== cleanName.toLowerCase()))
+        )
+
         markRoomDirty(room.code)
+        socket.join(room.code)
+        ;(socket as any).roomCode = room.code
+        ;(socket as any).sessionToken = token
 
         // Broadcast updated participant list
         io.to(room.code).emit('participants-update', roomInfo(room))
 
-        // Send snapshot resume from current version
-        socket.join(room.code)
-        ;(socket as any).roomCode = room.code
-        ;(socket as any).sessionToken = socket.id
+        // Send snapshot resume from current version with full room data
         socket.emit('room-snapshot-resume', {
           ...roomInfo(room),
           playbackState: room.playbackState,
+          playlist: room.playbackState.playlist,
+          activePoll: room.activePoll || null,
+          chatMessages: room.chatMessages || [],
         })
 
         console.log(`Participant ${cleanName} reconnected within grace period`)
         return
+      } else {
+        // Grace period expired, treat as new join: remove the old disconnected participant
+        room.participants = room.participants.filter((p) => p !== existingParticipant)
       }
     }
 
-    // Add participant
+    // 3. Ensure no duplicate disconnected entries for this user / session exist
+    room.participants = room.participants.filter(
+      (p) =>
+        p.id !== socket.id &&
+        (!sessionToken || (p as any).sessionToken !== sessionToken) &&
+        (p.connected || (cleanName.toLowerCase() !== 'anonymous' && p.name.toLowerCase() !== cleanName.toLowerCase()))
+    )
+
+    // 4. Add participant
     const participant: Participant = {
       id: socket.id,
       name: cleanName,
       connected: true,
       joinedAt: Date.now(),
     }
+    if (sessionToken) (participant as any).sessionToken = sessionToken
     room.participants.push(participant)
 
-    // Set as host if first participant or no host
-    if (room.participants.length === 1 || !room.hostId) {
+    // Set as host if first connected participant or no host
+    if (room.participants.filter((p) => p.connected).length === 1 || !room.hostId) {
       room.hostId = socket.id
     }
 
     markRoomDirty(room.code)
     socket.join(room.code)
     ;(socket as any).roomCode = room.code
-    ;(socket as any).sessionToken = socket.id // session token is the socket id
+    ;(socket as any).sessionToken = token
 
     // Broadcast updated participant list
     io.to(room.code).emit('participants-update', roomInfo(room))
@@ -549,11 +615,12 @@ io.on('connection', (socket) => {
     // Check if within grace period
     if (participant.leftAt && Date.now() - participant.leftAt < gracePeriod) {
       // Restore participant
+      const oldId = participant.id
       participant.id = socket.id
       participant.connected = true
       participant.leftAt = undefined
 
-      if (foundRoom.hostId === null || foundRoom.hostId === participant.id) {
+      if (foundRoom.hostId === null || foundRoom.hostId === oldId) {
         foundRoom.hostId = socket.id
       }
       markRoomDirty(foundRoom.code)
@@ -568,6 +635,9 @@ io.on('connection', (socket) => {
       socket.emit('room-snapshot-resume', {
         ...roomInfo(foundRoom),
         playbackState: foundRoom.playbackState,
+        playlist: foundRoom.playbackState.playlist,
+        activePoll: foundRoom.activePoll || null,
+        chatMessages: foundRoom.chatMessages || [],
       })
 
       console.log(`Participant ${socketId} reconnected within grace period`)
@@ -1107,11 +1177,16 @@ socket.on('reorder-playlist', ({ itemIds, clientSeq, baseVersion, userId }: { it
     if (!room) return
 
     // Mark participant as disconnected
-    const participant = room.participants.find((p) => p.id === socket.id)
-    if (participant) {
-      participant.connected = false
-      participant.leftAt = Date.now()
-    }
+    let participantFound = false
+    room.participants.forEach((p) => {
+      if (p.id === socket.id) {
+        p.connected = false
+        p.leftAt = Date.now()
+        participantFound = true
+      }
+    })
+
+    if (!participantFound) return
 
     // If host disconnects, automatically transfer host to the earliest connected participant
     if (room.hostId === socket.id) {
@@ -1138,27 +1213,30 @@ socket.on('reorder-playlist', ({ itemIds, clientSeq, baseVersion, userId }: { it
 
     // Schedule cleanup after grace period
     setTimeout(() => {
-      const p = room.participants.find((item) => item.id === socket.id)
-      if (p && !p.connected) {
-        room.participants = room.participants.filter((item) => item.id !== socket.id)
-        if (room.hostId === socket.id || room.hostId === null) {
-          const nextHost = selectNextHost(room.participants)
+      const currentRoom = rooms.get(roomCode)
+      if (!currentRoom) return
+
+      const wasDisconnected = currentRoom.participants.some((item) => item.id === socket.id && !item.connected)
+      if (wasDisconnected) {
+        currentRoom.participants = currentRoom.participants.filter((item) => !(item.id === socket.id && !item.connected))
+        if (currentRoom.hostId === socket.id || currentRoom.hostId === null) {
+          const nextHost = selectNextHost(currentRoom.participants)
           if (nextHost) {
-            room.hostId = nextHost.id
+            currentRoom.hostId = nextHost.id
             io.to(roomCode).emit('host-transfer', {
-              newHostId: room.hostId,
+              newHostId: currentRoom.hostId,
               previousHostId: socket.id,
               newHostName: nextHost.name,
             })
             io.to(roomCode).emit('room-settings', {
-              everyoneCanControl: room.everyoneCanControl,
-              hostId: room.hostId,
+              everyoneCanControl: currentRoom.everyoneCanControl,
+              hostId: currentRoom.hostId,
             })
           } else {
-            room.hostId = null
+            currentRoom.hostId = null
           }
         }
-        io.to(roomCode).emit('participants-update', roomInfo(room))
+        io.to(roomCode).emit('participants-update', roomInfo(currentRoom))
         markRoomDirty(roomCode)
       }
     }, gracePeriod)

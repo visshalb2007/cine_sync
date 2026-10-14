@@ -2345,7 +2345,13 @@
           setConn(myRoomCode ? 'connected · room ' + myRoomCode : 'connected', '');
           const t = Date.now();
           socket.emit('client-hello', { clientTime: t });
-          if (joined) socket.emit('join-room', { roomCode: myRoomCode, name: myName });
+          if (joined) {
+            socket.emit('join-room', {
+              roomCode: myRoomCode,
+              name: myName,
+              sessionToken: getSessionToken(),
+            });
+          }
         });
 
         socket.on('disconnect', () => {
@@ -2374,10 +2380,7 @@
         });
 
         socket.on('room-snapshot', onSnapshot);
-        socket.on('room-snapshot-resume', (data) => {
-          baseVersion = data.version;
-          applyState(data.playbackState, true);
-        });
+        socket.on('room-snapshot-resume', onSnapshot);
 
         function applyRoomMeta(data) {
           if (!data) return;
@@ -2551,6 +2554,13 @@
         myRoomCode = data.roomCode || myRoomCode;
         const codeVal = roomCodeEl?.querySelector('.code-value');
         if (codeVal) codeVal.textContent = myRoomCode || 'X7PV9P';
+        try {
+          if (myRoomCode && window.location.search.indexOf(myRoomCode) === -1) {
+            const currentUrl = new URL(window.location.href);
+            currentUrl.searchParams.set('code', myRoomCode);
+            window.history.replaceState({}, '', currentUrl.toString());
+          }
+        } catch (e) {}
         if ('hostId' in data) myHostId = data.hostId;
         if ('everyoneCanControl' in data) {
           myEveryoneCanControl = data.everyoneCanControl !== false;
@@ -2818,10 +2828,46 @@
           : (myEveryoneCanControl ? 'Everyone can control playback' : 'Host-only control — ask the host');
       }
 
+      function deduplicateParticipants(list) {
+        if (!list || !list.length) return [];
+        const seen = new Map();
+        for (const p of list) {
+          if (!p) continue;
+          const key = (p.id || p.sessionToken || Math.random()).toString();
+          let existingKey = null;
+          for (const [k, v] of seen.entries()) {
+            const sameSession = p.sessionToken && v.sessionToken && p.sessionToken === v.sessionToken;
+            const sameId = p.id && v.id && p.id === v.id;
+            const sameNonAnonName =
+              p.name &&
+              v.name &&
+              p.name.trim().toLowerCase() !== 'anonymous' &&
+              p.name.trim().toLowerCase() === v.name.trim().toLowerCase();
+
+            if (sameSession || sameId || sameNonAnonName) {
+              existingKey = k;
+              break;
+            }
+          }
+          if (existingKey) {
+            const existing = seen.get(existingKey);
+            if (p.connected !== false && existing.connected === false) {
+              seen.delete(existingKey);
+              seen.set(key, p);
+            }
+          } else {
+            seen.set(key, p);
+          }
+        }
+        return Array.from(seen.values());
+      }
+
       function renderParticipants(list) {
-        lastParticipants = list || [];
+        lastParticipants = deduplicateParticipants(list);
         const me = socket ? socket.id : '';
-        const count = lastParticipants.length || 1;
+        const onlineCount = lastParticipants.filter((p) => p.connected !== false).length;
+        const totalCount = lastParticipants.length;
+        const count = onlineCount > 0 ? onlineCount : (totalCount || (joined ? 1 : 0));
         if (headerParticipantCount) headerParticipantCount.textContent = count;
         if (watchCount) {
           watchCount.textContent = count + (count === 1 ? ' person watching' : ' people watching');
@@ -3244,14 +3290,35 @@
       });
 
       // ---------- Join Flow ----------
+      function getSessionToken() {
+        try {
+          let token = sessionStorage.getItem('cinesync_session_token');
+          if (!token) {
+            token = 'sess_' + Math.random().toString(36).substring(2, 12) + '_' + Date.now();
+            sessionStorage.setItem('cinesync_session_token', token);
+          }
+          return token;
+        } catch (e) {
+          return '';
+        }
+      }
+
       function doJoin(code) {
         if (joinError) joinError.textContent = '';
         myName = (nameInput.value.trim() || 'Anonymous').slice(0, 40);
         myRoomCode = (code || '').trim().toUpperCase();
+        try {
+          sessionStorage.setItem('cinesync_user_name', myName);
+          if (myRoomCode) sessionStorage.setItem('cinesync_room_code', myRoomCode);
+        } catch (e) {}
         if (headerUserAvatar) {
           headerUserAvatar.textContent = (myName.charAt(0) || 'V').toUpperCase();
         }
-        socket.emit('join-room', { roomCode: myRoomCode, name: myName });
+        socket.emit('join-room', {
+          roomCode: myRoomCode,
+          name: myName,
+          sessionToken: getSessionToken(),
+        });
       }
 
       $('createBtn').addEventListener('click', () => doJoin(''));
