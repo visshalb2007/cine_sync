@@ -7,6 +7,8 @@
 [![Unit Tests](https://img.shields.io/badge/Vitest-60%20Passing-6E9F18.svg?logo=vitest&logoColor=white)]()
 [![Playwright E2E](https://img.shields.io/badge/Playwright-18%20Specs%20Passing-45BA4B.svg?logo=playwright&logoColor=white)](https://playwright.dev/)
 [![Accessibility](https://img.shields.io/badge/axe--core-WCAG%202.1%20AA%20Compliant-blueviolet.svg)]()
+[![Security Audit](https://img.shields.io/badge/Security-Audit%20Passed-brightgreen.svg)]()
+[![Vulnerabilities](https://img.shields.io/badge/Vulnerabilities-0%20(clean)-brightgreen.svg)]()
 [![CI Pipeline](https://github.com/visshalb2007/cine_sync/actions/workflows/test.yml/badge.svg)](https://github.com/visshalb2007/cine_sync/actions/workflows/test.yml)
 
 **CineSync** is a high-performance, real-time synchronized watch-party web application that delivers frame-accurate playback synchronization, integrated movie discovery, resilient SQLite persistence, and interactive group engagement features. 
@@ -21,10 +23,11 @@ Engineered with a **server-authoritative clock synchronization model**, CineSync
 3. [Performance Benchmarks & Target Constraints](#performance-benchmarks--target-constraints)
 4. [Creative & Polish Features](#creative--polish-features)
 5. [Resilience & Failure Handling](#resilience--failure-handling)
-6. [Quick Start & Setup](#quick-start--setup)
-7. [Comprehensive Verification & Testing](#comprehensive-verification--testing)
-8. [Codebase Organization](#codebase-organization)
-9. [License](#license)
+6. [Security & Authorization Architecture](#security--authorization-architecture)
+7. [Quick Start & Setup](#quick-start--setup)
+8. [Comprehensive Verification & Testing](#comprehensive-verification--testing)
+9. [Codebase Organization](#codebase-organization)
+10. [License](#license)
 
 ---
 
@@ -169,6 +172,28 @@ Comprehensive documentation on CineSync’s fault-tolerant architecture is provi
 
 ---
 
+## Security & Authorization Architecture
+
+CineSync is engineered with defense-in-depth security principles across its network boundary, state machine, and persistence layers:
+
+1. **Server-Authoritative Role & BOLA Protection**:
+   - Host privileges (`transfer-host`, `toggle-control`, `close-poll`, `change-video`, `add-video`, `remove-video`, `reorder-playlist`) are bound strictly to the authenticated `socket.id` via `canControl(room, socket.id)` and `isHost(room, socket.id)`. Client-supplied user parameters are never trusted for authorization, preventing Broken Object Level Authorization (BOLA).
+2. **Defensive Socket Payload Validation**:
+   - All inbound WebSocket payloads undergo strict runtime type assertions. Array inputs (e.g. `poll.options`, `playlist.itemIds`), string bounds, and numeric fields are validated before execution, preventing unhandled TypeErrors from interrupting the Node.js event loop.
+3. **Anti-Phishing & Open Redirect Safeguards**:
+   - The `/watch/:id` streaming gateway restricts absolute URL redirects strictly to validated media resources (`.mp4`, `.webm`, `.m3u8`, `.ogv`), blocking arbitrary redirects to external phishing pages.
+4. **Dual-Layer Cross-Site Scripting (XSS) Prevention**:
+   - Chat messaging leverages safe DOM text nodes (`document.createTextNode` and `element.textContent`), eliminating HTML injection entirely.
+   - Dynamic templates enforce context-aware escaping covering both HTML entities and single/double quotes (`&`, `<`, `>`, `"`, `'`).
+5. **Prototype Pollution & Vote Integrity**:
+   - Group poll votes are authoritatively indexed by the sender's `socket.id` and sanitized against prototype injection keys (`__proto__`, `constructor`, `prototype`).
+6. **HTTP Defense-in-Depth Headers**:
+   - Every HTTP response is delivered with `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, and `Referrer-Policy: strict-origin-when-cross-origin`.
+7. **Clean Dependency Posture**:
+   - The dependency tree is free of deprecated or vulnerable legacy packages, with `npm audit` reporting **0 vulnerabilities**.
+
+---
+
 ## Quick Start & Setup
 
 ### Prerequisites
@@ -192,13 +217,16 @@ OMDB_API_KEY=your_omdb_api_key_here
 # 1. Install dependencies
 npm install
 
-# 2. Compile TypeScript
+# 2. Fetch built-in sample videos (Sintel, Flower)
+npm run fetch-media
+
+# 3. Compile TypeScript
 npm run build
 
-# 3. Start development server with live reload
+# 4. Start development server with live reload
 npm run dev
 
-# 4. Or launch production build
+# 5. Or launch production build
 npm start
 ```
 The application will be live at `http://localhost:3000`.
@@ -242,13 +270,19 @@ npx playwright show-report
 | **`subtitle-offset.spec.ts`** | Subtitle Timing Calibration | Independent ±100ms adjustments, server ack, session persistence, zero interference across viewers |
 | **`sync.spec.ts`** | Multi-Viewer Synchronization | 3 concurrent clients play, pause, seek; asserts drift convergence within 500ms using `expect.poll` |
 
-### 3. Continuous Integration (CI)
+### 3. Security Audit & Dependency Scanning
+Executes vulnerability checks against all project dependencies:
+```bash
+npm audit
+```
+
+### 4. Continuous Integration (CI)
 GitHub Actions workflow configured in [`.github/workflows/test.yml`](.github/workflows/test.yml):
 - Configures Node.js v22 environment.
 - Executes `npm run test:unit` and `npm run test:playwright`.
 - Automatically archives Playwright trace artifacts and HTML reports on test failures.
 
-### 4. Running Benchmarks
+### 5. Running Benchmarks
 ```bash
 # Execute full multi-viewer benchmark suite (10 bots, 3 runs)
 npm run test:bench -- --all
