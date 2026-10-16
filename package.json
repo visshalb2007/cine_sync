@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "engines": {
-    "node": ">=22"
+    "node": ">=20.0.0"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -12,8 +12,9 @@
     "test:playwright": "npx playwright test",
     "test:bench": "npx tsx bot-harness.ts",
     "dev": "npx tsx watch server/index.ts",
+    "prestart": "npm run build",
     "start": "node dist/server/index.js",
-    "build": "npx tsc",
+    "build": "npx tsc && node scripts/copy-assets.mjs && node scripts/fetch-media.mjs",
     "fetch-media": "node scripts/fetch-media.mjs"
   },
   "repository": {

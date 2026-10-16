@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: cine-sync
+    env: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: HOST
+        value: 0.0.0.0
+      - key: PORT
+        value: 10000

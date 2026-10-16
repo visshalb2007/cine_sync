@@ -22,13 +22,20 @@ for (const f of FILES) {
     continue;
   }
   console.log(`downloading ${f.name}...`);
-  const res = await fetch(f.url);
-  if (!res.ok || !res.body) throw new Error(`fetch failed ${f.url}: ${res.status}`);
-  const ws = createWriteStream(dest);
-  await res.body.pipeTo(new (await import('stream/web')).WritableStream({
-    write: (c) => new Promise((ok, bad) => ws.write(Buffer.from(c), (e) => (e ? bad(e) : ok()))),
-    close: () => new Promise((ok) => ws.end(ok)),
-  }));
-  console.log(`saved ${f.name} (${(statSync(dest).size / 1048576).toFixed(1)} MB)`);
+  try {
+    const res = await fetch(f.url, { signal: AbortSignal.timeout(15000) });
+    if (!res.ok || !res.body) {
+      console.warn(`warning: fetch failed for ${f.name} (${res.status}), continuing...`);
+      continue;
+    }
+    const ws = createWriteStream(dest);
+    await res.body.pipeTo(new (await import('stream/web')).WritableStream({
+      write: (c) => new Promise((ok, bad) => ws.write(Buffer.from(c), (e) => (e ? bad(e) : ok()))),
+      close: () => new Promise((ok) => ws.end(ok)),
+    }));
+    console.log(`saved ${f.name} (${(statSync(dest).size / 1048576).toFixed(1)} MB)`);
+  } catch (err) {
+    console.warn(`warning: could not download ${f.name} (${err.message}), continuing without sample...`);
+  }
 }
 console.log('done.');

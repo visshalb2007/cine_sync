@@ -206,7 +206,8 @@ const io = new Server(httpServer, {
   pingTimeout: process.env.SOCKET_PING_TIMEOUT ? Number(process.env.SOCKET_PING_TIMEOUT) : 20000,
 })
 
-const PORT = process.env.PORT || 3000
+const PORT = Number(process.env.PORT) || 3000
+const HOST = process.env.HOST || '0.0.0.0'
 
 let _db: ReturnType<typeof createDatabase> | null = null
 
@@ -1373,8 +1374,8 @@ const serverTimeTimer = setInterval(() => {
 serverTimeTimer.unref()
 
 if (!process.env.VITEST) {
-  httpServer.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`)
+  httpServer.listen(PORT, HOST, () => {
+    console.log(`Server running on http://${HOST}:${PORT}`)
   }).on('error', (err: any) => {
     if (err.code === 'EADDRINUSE') {
       console.log(`Port ${PORT} is already in use, assuming server is running.`)

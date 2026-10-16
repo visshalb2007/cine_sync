@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3'
 import path from 'path'
+import fs from 'fs'
 
 export type Participant = {
   id: string
@@ -217,6 +218,13 @@ export function createDatabase(dbPath?: string): Database.Database {
     dbPath ||
     process.env.DB_PATH ||
     (process.env.VITEST ? ':memory:' : path.join(process.cwd(), 'cine_sync.db'))
+
+  if (resolvedPath !== ':memory:') {
+    const dbDir = path.dirname(resolvedPath)
+    if (dbDir && !fs.existsSync(dbDir)) {
+      fs.mkdirSync(dbDir, { recursive: true })
+    }
+  }
 
   const db = new Database(resolvedPath)
   if (resolvedPath !== ':memory:') {
