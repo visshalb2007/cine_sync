@@ -207,7 +207,7 @@ const io = new Server(httpServer, {
 })
 
 const PORT = Number(process.env.PORT) || 3000
-const HOST = process.env.HOST || '0.0.0.0'
+const HOST = process.env.HOST || 'localhost'
 
 let _db: ReturnType<typeof createDatabase> | null = null
 

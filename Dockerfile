@@ -23,7 +23,7 @@ FROM node:22-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
-ENV HOST=0.0.0.0
+ENV HOST=localhost
 
 # Install runtime dependencies for native better-sqlite3
 RUN apt-get update && apt-get install -y python3 make g++ --no-install-recommends \
