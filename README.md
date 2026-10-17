@@ -15,6 +15,16 @@
 
 Engineered with a **server-authoritative clock synchronization model**, CineSync guarantees playback control propagation of **≤ 1.31 ms (p95)** and steady-state playback drift of **≤ 17.29 ms**, comfortably outperforming industry standards across multi-client networks.
 
+
+
+
+
+https://github.com/user-attachments/assets/6f6fc85c-382c-4802-b534-6fc848219846
+
+
+
+
+
 ---
 
 ## Table of Contents
